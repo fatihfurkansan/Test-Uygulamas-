@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PV Modül Tasarım</title>
+<meta name="description" content="PV modül üretimi için tasarım, CTM kayıp/kazanç zinciri, Monte Carlo tolerans analizi, BOM maliyeti ve 220+ varyantlı hammadde kütüphanesi. Telefonda çevrimdışı çalışır.">
+<meta name="theme-color" content="#121921" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)">
+<meta property="og:title" content="PV Modül Tasarım">
+<meta property="og:description" content="Modülü üretmeden önce hesaplayın: çizim, CTM, tolerans, BOM ve maliyet tek uygulamada.">
+<meta property="og:image" content="/assets/icons/icon-512.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/assets/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body>
+<header class="nav">
+  <div class="wrap navin">
+    <a class="logo" href="/"><img src="/assets/icons/icon.svg" alt="" width="28" height="28"><span>PV Modül Tasarım</span></a>
+    <nav aria-label="Bölümler"><a href="#ozellikler">Özellikler</a><a href="#ctm">CTM modeli</a><a href="#kutuphane">Kütüphane</a><a href="#kurulum">Kurulum</a></nav>
+    <a class="btn pri" href="/app/">Uygulamayı aç</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap herogrid">
+      <div class="herotext">
+        <p class="eyebrow">Modül üretim mühendisliği için</p>
+        <h1>Modülü üretmeden önce hesaplayın.</h1>
+        <p class="lead">Hücre dizilimi, aralıklar ve malzeme seçiminden modül gücüne, CTM oranına, tolerans riskine ve $/W maliyetine kadar her şey tek ekranda. Telefonda çevrimdışı çalışır, kurulum gerektirmez.</p>
+        <div class="ctas"><a class="btn pri lg" href="/app/">Uygulamayı aç</a><a class="btn lg" href="#kurulum">Telefona yükle</a></div>
+        <p class="small">Veriler yalnız sizin cihazınızda saklanır. Sunucuya hiçbir tasarım gönderilmez.</p>
+      </div>
+      <figure class="herofig" aria-label="Örnek modül hesap sonucu">
+        <div class="figtop"><span class="eyebrow" id="exName">Örnek tasarım</span><span class="live">canlı hesap</span></div>
+        <div class="figbody">
+          <div id="exDraw" class="exdraw"></div>
+          <dl class="exk" id="exKpi"></dl>
+        </div>
+        <figcaption id="exCap">Uygulamanın hesap motoruyla bu sayfa açılırken hesaplandı.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="ozellikler" class="band">
+    <div class="wrap">
+      <h2>Bir modül tasarımının tüm zinciri</h2>
+      <div class="feat">
+        <article><h3>Ölçekli teknik çizim</h3><p>Parametre değiştikçe güncellenen üstten görünüm, ölçü okları, köşe ve aralık detayları. Kenar mesafesi gibi sınır ihlalleri kırmızı görünür.</p></article>
+        <article><h3>CTM kayıp/kazanç zinciri</h3><p>Kesme, cam yansıması ve soğurması, enkapsülan, indeks uyumu, gap geri yansıması, tel gölgesi, direnç kayıpları ve mismatch adım adım. Ölçüm verinizle kalibre edin.</p></article>
+        <article><h3>Monte Carlo tolerans</h3><p>10.000 iterasyonda Pmax ve verim dağılımı, güç sınıfı payları, kenar mesafesi ve boyut ihlali olasılıkları, Cpk değerleri.</p></article>
+        <article><h3>BOM ve maliyet</h3><p>Geometriden hesaplanan miktarlar, düzenlenebilir birim fiyat ve fire oranları, yield karşılığı, modül başı maliyet ve $/W.</p></article>
+        <article><h3>Datasheet değerleri</h3><p>Sıcaklık katsayıları, NMOT gücü, bifasiyal kazanç (BNPI), garanti eğrisi, −10 °C Voc ve modül başı gümüş miktarı.</p></article>
+        <article><h3>Karşılaştırma ve rapor</h3><p>Tasarımları yan yana koyun; ΔPmax, Δverim, Δmaliyet ve Δ$/W tablosu. JSON kaydı ve çok sayfalı Excel çıktısı.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="ctm">
+    <div class="wrap two">
+      <div>
+        <h2>Şeffaf CTM modeli</h2>
+        <p>Modül gücü, hücre toplam gücünün kayıp ve kazanç faktörleriyle çarpımıdır. Her faktörün katsayısı uygulamada görünür ve değiştirilebilir. Hiçbir sonuç kara kutu değildir.</p>
+        <p class="small">Katsayılar tipik değerlerle gelir. CTM sekmesinde ölçülen modül ve hücre güçlerinizi girerek kalibrasyon çarpanını bulun.</p>
+      </div>
+      <div class="formulas" role="list">
+        <div role="listitem"><b>Modül gücü</b><code>P<sub>mod</sub> = N · P<sub>yarım</sub> · Π k<sub>i</sub></code></div>
+        <div role="listitem"><b>Cam ve enkapsülan</b><code>k<sub>opt</sub> = (1 − R<sub>ön</sub>) · e<sup>−α·t</sup> · T<sub>enk</sub> · (1 + G<sub>IM</sub>)</code></div>
+        <div role="listitem"><b>Gap geri yansıması</b><code>k<sub>gap</sub> = 1 + R<sub>arka</sub> · f<sub>yak</sub> · A<sub>gap</sub> / A<sub>hücre</sub></code></div>
+        <div role="listitem"><b>Tel gölgesi</b><code>k<sub>gölge</sub> = 1 − N<sub>bb</sub> · (d − w<sub>pad</sub>) · ℓ · (1 − r<sub>w</sub>) / A</code></div>
+        <div role="listitem"><b>Tel direnci</b><code>P<sub>tel</sub> = N · N<sub>bb</sub> · I<sub>w</sub>² · R′ · (2ℓ/3 + g)</code></div>
+        <div role="listitem"><b>Bifasiyal (BNPI)</b><code>P<sub>BNPI</sub> = P<sub>mod</sub> · (1 + φ<sub>mod</sub> · 135/1000)</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="kutuphane" class="band">
+    <div class="wrap">
+      <h2>Hammadde kütüphanesi</h2>
+      <p class="lead2"><b id="libTotal">220+</b> malzeme varyantı, <b id="libCats">19</b> kategori, 125 mm’den G12’ye ve Al-BSF’ten tandem hücreye kadar. Arayın, karşılaştırın, tek dokunuşla tasarıma uygulayın. Kendi malzemelerinizi ve tedarikçi fiyat listenizi ekleyin.</p>
+      <div class="libgrid" id="libGrid"></div>
+      <h3 class="sub">Hazır modül şablonları</h3>
+      <div class="eras">
+        <div><b>Güncel</b><p>TOPCon G12R / M10R / G12 · 0BB · HJT · BC all-black · perovskit/Si tandem</p></div>
+        <div><b>Geçiş dönemi</b><p>PERC M10 / M6 / G1 yarım hücre · n-PERT bifasiyal · MWT iletken backsheet</p></div>
+        <div><b>Eski tip</b><p>Al-BSF ve PERC M2 · M0 156 · 125 mm · 2BB–5BB yassı ribbon · 36 hücre 12 V</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="kurulum">
+    <div class="wrap">
+      <h2>Telefona yükleyin</h2>
+      <p>Uygulama bir PWA’dır: mağaza gerekmez, ana ekrana eklenir ve internet olmadan çalışır. Güncellemeler açılışta otomatik gelir.</p>
+      <div class="steps">
+        <div><h3>Android · Chrome</h3><ol><li>Uygulamayı açın.</li><li>Üstteki <b>Uygulamayı yükle</b> düğmesine veya menüdeki <b>Uygulamayı yükle</b> seçeneğine dokunun.</li></ol></div>
+        <div><h3>iPhone · Safari</h3><ol><li>Uygulamayı Safari’de açın.</li><li><b>Paylaş</b> ▸ <b>Ana Ekrana Ekle</b> adımlarını izleyin.</li></ol></div>
+        <div><h3>Masaüstü · Chrome / Edge</h3><ol><li>Uygulamayı açın.</li><li>Adres çubuğundaki yükleme simgesine tıklayın.</li></ol></div>
+      </div>
+      <div class="ctas"><a class="btn pri lg" href="/app/">Uygulamayı aç</a></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><div class="wrap"><p>PV Modül Tasarım · Hesaplar tipik katsayılarla yapılır. Üretim kararları için kendi ölçüm verinizle kalibre edin. Fiyatlar örnek değerlerdir.</p></div></footer>
+
+<script src="/assets/js/library.js"></script>
+<script src="/assets/js/engine.js"></script>
+<script src="/assets/js/site.js"></script>
+<script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('/sw.js').catch(()=>{});</script>
+</body>
+</html>

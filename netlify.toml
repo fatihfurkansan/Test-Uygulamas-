@@ -1,0 +1,4 @@
+# Netlify: depoyu bağlayınca derleme gerekmez, web/ klasörü olduğu gibi yayınlanır.
+[build]
+  publish = "web"
+  command = ""

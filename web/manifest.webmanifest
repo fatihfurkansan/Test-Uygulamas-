@@ -1,0 +1,26 @@
+{
+  "name": "PV Modül Tasarım",
+  "short_name": "PV Tasarım",
+  "description": "PV modül tasarımı, CTM, Monte Carlo tolerans analizi, BOM maliyeti ve hammadde kütüphanesi",
+  "lang": "tr",
+  "dir": "ltr",
+  "id": "/app/",
+  "start_url": "/app/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c1117",
+  "theme_color": "#121921",
+  "categories": ["productivity", "utilities", "business"],
+  "icons": [
+    {"src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    {"src": "/assets/icons/icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ],
+  "shortcuts": [
+    {"name": "Kütüphane", "url": "/app/#kutuphane"},
+    {"name": "CTM", "url": "/app/#ctm"},
+    {"name": "Maliyet / BOM", "url": "/app/#maliyet"}
+  ]
+}

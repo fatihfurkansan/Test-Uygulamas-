@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PV Modül Tasarım</title>
+<meta name="description" content="PV modül tasarımı, CTM kayıp/kazanç zinciri, Monte Carlo tolerans analizi, BOM maliyeti ve hammadde kütüphanesi.">
+<meta name="theme-color" content="#121921" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PV Tasarım">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/app.css">
+<script src="../assets/vendor/xlsx.full.min.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="../" aria-label="Ana sayfa"><b>PV Modül Tasarım</b><span id="hdrName">–</span></a>
+    <button class="btn sm pri" id="installBtn" hidden>Uygulamayı yükle</button>
+    <div class="kpis" id="kpis"></div>
+  </div>
+  <nav class="wrap tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="tasarim">Tasarım</button>
+    <button class="tab" role="tab" data-tab="cizim">Çizim</button>
+    <button class="tab" role="tab" data-tab="ctm">CTM</button>
+    <button class="tab" role="tab" data-tab="tolerans">Tolerans</button>
+    <button class="tab" role="tab" data-tab="maliyet">Maliyet / BOM</button>
+    <button class="tab" role="tab" data-tab="kutuphane">Kütüphane</button>
+    <button class="tab" role="tab" data-tab="karsilastir">Karşılaştır</button>
+    <button class="tab" role="tab" data-tab="kayit">Kayıt</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- TASARIM -->
+  <section class="panel" data-panel="tasarim">
+    <div class="design">
+      <div class="panel">
+        <div class="card">
+          <div class="cardhead"><h3>Modül yapısı şablonu</h3><small>Seçince tüm girdiler şablona göre yüklenir</small></div>
+          <div class="row wide" style="border:0;padding:0">
+            <label for="tplSel">Sektör örnekleri</label>
+            <select id="tplSel"></select>
+          </div>
+        </div>
+        <div class="card"><h3>Sonuç özeti</h3><div class="stats" id="sumStats"></div><div class="viol" id="violBox" style="margin-top:12px"></div></div>
+        <div id="inputsDesign" class="panel"></div>
+      </div>
+      <div class="side-draw card draw"><div class="cardhead"><h3>Üstten görünüm</h3><small>Ölçek gerçek · mm</small></div><div id="drawSide"></div></div>
+    </div>
+  </section>
+
+  <!-- ÇİZİM -->
+  <section class="panel" data-panel="cizim" hidden>
+    <div class="card draw">
+      <div class="cardhead"><h3>Teknik çizim · üstten görünüm</h3><small>Ölçüler mm · arka taraftaki parçalar kesikli</small></div>
+      <div class="legend" style="margin-bottom:8px">
+        <span style="--sw:var(--cell)">Hücre</span><span style="--sw:var(--cellwire)">Bağlantı teli</span><span style="--sw:var(--bus)">Bus ribbon</span><span style="--sw:var(--glass)">Cam</span><span style="--sw:var(--frame)">Çerçeve</span><span style="--sw:var(--bad)">Sınır ihlali</span>
+      </div>
+      <div id="drawMain"></div>
+    </div>
+    <div class="card"><h3>Detaylar</h3><div class="details" id="drawDetails"></div></div>
+    <div class="card"><h3>Sınır kontrolleri</h3><div class="viol" id="violBox2"></div></div>
+  </section>
+
+  <!-- CTM -->
+  <section class="panel" data-panel="ctm" hidden>
+    <div class="card"><div class="stats" id="ctmStats"></div></div>
+    <div class="card">
+      <div class="cardhead"><h3>CTM kayıp / kazanç zinciri</h3><small>Çarpımsal: P<sub>mod</sub> = ΣP<sub>hücre</sub> · Π k<sub>i</sub></small></div>
+      <div class="chain" id="chain"></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Elektriksel tahmin (STC)</h3><div class="tw"><table id="elecTbl"></table></div></div>
+      <div class="card"><h3>Hesap ayrıntıları</h3><div class="tw"><table id="ctmDetail"></table></div></div>
+    </div>
+    <div class="card"><div class="cardhead"><h3>Datasheet ve saha değerleri</h3><small>Sıcaklık, bifasiyal kazanç, garanti</small></div><div class="tw"><table id="dsTbl"></table></div></div>
+    <div id="inputsCTM" class="panel"></div>
+    <div class="card">
+      <div class="cardhead"><h3>Ölçüm verisiyle kalibrasyon</h3><button class="btn sm" id="calSample">Örnek veri yükle</button></div>
+      <p class="note">Her satıra bir modül: <span class="mono">ΣHücre_W ; Modül_Pmax_W</span>. Yalnız modül Pmax girilirse hücre toplamı olarak nominal değer kullanılır. Ondalık ayırıcı virgül veya nokta olabilir.</p>
+      <textarea id="calData" placeholder="656,7 ; 631,2&#10;657,1 ; 632,8&#10;..."></textarea>
+      <div class="btns" style="margin-top:8px"><button class="btn" id="calRun">Kalibrasyonu hesapla</button><button class="btn pri" id="calApply" disabled>k_kal olarak uygula</button></div>
+      <div id="calOut" class="note" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- TOLERANS -->
+  <section class="panel" data-panel="tolerans" hidden>
+    <div id="inputsMC" class="panel"></div>
+    <div class="card">
+      <div class="cardhead"><h3>Monte Carlo tolerans analizi</h3><button class="btn pri" id="mcRun">Simülasyonu çalıştır</button></div>
+      <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Kenar mesafesi, cam ölçüsü, hücre bloğu uzunluğu ve lay-up kaçıklığından türetilir.</p>
+      <div id="mcOut" class="panel" style="margin-top:10px"><p class="note">Henüz çalıştırılmadı.</p></div>
+    </div>
+  </section>
+
+  <!-- MALİYET -->
+  <section class="panel" data-panel="maliyet" hidden>
+    <div class="card"><div class="stats" id="costStats"></div></div>
+    <div class="card">
+      <div class="cardhead"><h3>Malzeme listesi (BOM)</h3>
+        <div class="row wide" style="border:0;padding:0;min-width:200px"><label for="in-cur">Para birimi</label><select id="in-cur" data-k="cur"></select></div></div>
+      <p class="note">Fiyatlar sektör ortalamasına göre <b>örnek</b> değerlerdir; kendi tedarikçi fiyatlarınızı girin. Miktarlar geometriden hesaplanır. Tutar = miktar × birim fiyat × (1 + fire).</p>
+      <div class="tw"><table id="bomTbl"></table></div>
+    </div>
+    <div id="inputsCost" class="panel"></div>
+    </section>
+
+  <!-- KÜTÜPHANE -->
+  <section class="panel" data-panel="kutuphane" hidden>
+    <div class="card">
+      <div class="cardhead"><h3>Hammadde kütüphanesi</h3><small id="libStat"></small></div>
+      <div class="libbar">
+        <input type="search" id="libQ" placeholder="Ara: ör. POE, 0,24, backsheet, G12…" aria-label="Kütüphanede ara">
+        <select id="libCat" aria-label="Kategori"></select>
+        <select id="libEra" aria-label="Dönem"></select>
+        <select id="libSort" aria-label="Sıralama"><option value="cat">Kategoriye göre</option><option value="name">Ada göre</option><option value="price">Fiyata göre</option></select>
+        <label class="own"><input type="checkbox" id="libOwn"> Yalnız özel malzemelerim</label>
+      </div>
+      <p class="note">Bir malzemeye dokunarak teknik detayını, mevcut tasarıma göre türetilen değerleri ve fiyatını görün; "Tasarıma uygula" ile seçin. Kutucuklarla aynı kategoriden malzemeleri karşılaştırın.</p>
+      <div id="libList" class="liblist"></div>
+    </div>
+    <div class="card"><h3>Karşılaştırma</h3><div id="libCmp"></div></div>
+    <div class="card">
+      <h3>Özel malzeme ve fiyat listesi</h3>
+      <div class="row wide"><label for="libNewCat">Yeni malzeme kategorisi</label><select id="libNewCat"></select></div>
+      <div class="btns" style="margin-top:8px">
+        <button class="btn pri" id="libNew">Yeni malzeme ekle</button>
+        <button class="btn" id="libPriceDl">Fiyat listesini indir (CSV)</button>
+        <label class="btn" for="libPriceUp">Fiyat listesi yükle (CSV)</label><input type="file" id="libPriceUp" accept=".csv,text/csv,.txt" hidden>
+        <button class="btn" id="libJsonDl">Kütüphanemi indir (JSON)</button>
+        <label class="btn" for="libJsonUp">Kütüphane yükle (JSON)</label><input type="file" id="libJsonUp" accept=".json,application/json" hidden>
+        <button class="btn" id="libReset">Fiyatları varsayılana döndür</button>
+      </div>
+      <p class="note">CSV biçimi: <span class="mono">kategori;id;malzeme;birim_fiyat</span>. Önce fiyat listesini indirip Excel'de düzenleyin, sonra geri yükleyin. Özel malzemeler ve fiyatlar bu cihazda saklanır; başka cihaza JSON ile taşıyın.</p>
+      <p class="msg" id="libMsg"></p>
+    </div>
+  </section>
+
+  <!-- KARŞILAŞTIR -->
+  <section class="panel" data-panel="karsilastir" hidden>
+    <div class="card">
+      <div class="cardhead"><h3>Kayıtlı tasarımlar</h3><button class="btn pri" id="saveSlot">Mevcut tasarımı kaydet</button></div>
+      <p class="note">Karşılaştırmaya almak için işaretleyin; ◉ referans tasarımdır. Kayıtlar bu tarayıcıda tutulur. Kalıcı arşiv için Kayıt sekmesinden JSON indirin.</p>
+      <div class="savedlist" id="savedList"></div>
+    </div>
+    <div class="card"><h3>Fark tablosu</h3><div class="tw" id="cmpTbl"></div></div>
+    <div class="card"><h3>Farklı girdiler</h3><div class="tw" id="cmpDiff"></div></div>
+  </section>
+
+  <!-- KAYIT -->
+  <section class="panel" data-panel="kayit" hidden>
+    <div class="card">
+      <h3>Tasarım</h3>
+      <div class="row wide"><label for="in-name">Tasarım adı</label><input type="text" id="in-name" style="text-align:left;font-family:var(--f-body)"></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn pri dl" id="dlJson" hidden>JSON indir</button>
+        <button class="btn pri dl" id="dlXlsx" hidden>Excel'e aktar (.xlsx)</button>
+        <label class="btn" for="fileIn">JSON dosyası yükle</label><input type="file" id="fileIn" accept=".json,application/json" hidden>
+        <button class="btn" id="resetBtn">Varsayılana dön</button>
+      </div>
+      <p class="msg" id="dlNote"></p>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>JSON</h3><div class="btns"><button class="btn sm" id="jsonShow">Mevcut tasarımı göster</button><button class="btn sm" id="jsonCopy">Kopyala</button><button class="btn sm" id="jsonLoad">Bu JSON'u yükle</button></div></div>
+      <textarea id="jsonBox" spellcheck="false" style="min-height:14rem"></textarea>
+      <p class="msg" id="jsonMsg"></p>
+    </div>
+    <div class="card note">
+      <h3 style="color:var(--fg)">Model notları</h3>
+      <p>Hesap motoru <span class="mono">assets/js/engine.js</span> dosyasında, arayüzden bağımsızdır. Uygulama çevrimdışı çalışır; veriler yalnız bu cihazda saklanır. Ön yüz STC gücü hesaplanır; bifasiyal arka yüz kazancı modellenmez. Varsayılan katsayılar tipik değerlerdir. Kendi CTM ölçümlerinizle CTM sekmesinden kalibre edin.</p>
+    </div>
+  </section>
+</main>
+<dialog id="libDlg" aria-label="Malzeme detayı"><div id="libDlgBody"></div></dialog>
+
+<script src="../assets/js/library.js"></script>
+<script src="../assets/js/engine.js"></script>
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/libview.js"></script>
+<script src="../assets/js/pwa.js"></script>
+</body>
+</html>

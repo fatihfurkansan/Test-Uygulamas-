@@ -1,0 +1,1333 @@
+<title>PV Modül Tasarım</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style>
+/* Layout: mobile-first instrument panel — sticky KPI strip + scrollable tab bar over stacked cards;
+   from 980px the design tab puts the inputs beside a live, to-scale drawing. */
+:root{
+  --bg:#edf0f3; --surface:#fafbfc; --raised:#ffffff; --fg:#131b25; --muted:#5a6675; --line:#d2d9e1;
+  --accent:#1650c8; --accent-ink:#ffffff; --accent-soft:rgba(22,80,200,.10);
+  --cell:#1c2b4b; --cellwire:#a9bbdc; --glass:#dde7f1; --frame:#a7b0ba; --bus:#8d99a6; --dim:#2e3a48;
+  --good:#16804a; --loss:#c2461b; --bad:#d01f30; --bad-soft:rgba(208,31,48,.16); --warn:#a86a10;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1117; --surface:#121921; --raised:#17202a; --fg:#e2e8ee; --muted:#8e9bab; --line:#26313e;
+  --accent:#6f9bff; --accent-ink:#0c1117; --accent-soft:rgba(111,155,255,.14);
+  --cell:#2a3e69; --cellwire:#5f7cb3; --glass:#18242f; --frame:#56616e; --bus:#7c8794; --dim:#b8c3ce;
+  --good:#3cbf7c; --loss:#f08a4e; --bad:#ff5e6b; --bad-soft:rgba(255,94,107,.2); --warn:#e0a640; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1117; --surface:#121921; --raised:#17202a; --fg:#e2e8ee; --muted:#8e9bab; --line:#26313e;
+  --accent:#6f9bff; --accent-ink:#0c1117; --accent-soft:rgba(111,155,255,.14);
+  --cell:#2a3e69; --cellwire:#5f7cb3; --glass:#18242f; --frame:#56616e; --bus:#7c8794; --dim:#b8c3ce;
+  --good:#3cbf7c; --loss:#f08a4e; --bad:#ff5e6b; --bad-soft:rgba(255,94,107,.2); --warn:#e0a640; color-scheme:dark}
+
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1320px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.01em}
+h2{font-size:1.35rem;font-weight:600}
+h3{font-size:1.08rem;font-weight:600}
+.num,td.n,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+small,.muted{color:var(--muted)}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:12px;padding-block:8px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;min-width:0;flex:1 1 180px}
+.brand b{font-family:var(--f-display);font-size:1.15rem;font-weight:700;letter-spacing:.02em}
+.brand span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px 14px;flex:3 1 520px}
+.kpi{min-width:0}
+.kpi i{display:block;font-style:normal;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.kpi b{font-family:var(--f-mono);font-weight:500;font-size:15px;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.chip.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.chip.good{color:var(--good);border-color:color-mix(in srgb,var(--good) 50%,transparent)}
+.chip.warn{color:var(--warn);border-color:var(--warn)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{appearance:none;border:0;background:none;padding:9px 12px 8px;border-bottom:2px solid transparent;color:var(--muted);font-weight:500;white-space:nowrap;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+@media (max-width:620px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi b{font-size:14px}}
+
+main{padding-block:16px 48px}
+.panel{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
+.card>h3{margin-bottom:8px}
+.cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.note{font-size:12.5px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.design{display:grid;grid-template-columns:1fr;gap:14px}
+.side-draw{display:none}
+@media (min-width:980px){.design{grid-template-columns:minmax(0,1fr) minmax(0,.9fr)}.side-draw{display:block;position:sticky;top:120px;align-self:start}}
+
+/* stat tiles */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.stat{border-left:2px solid var(--line);padding:2px 0 2px 10px}
+.stat i{display:block;font-style:normal;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat b{font-family:var(--f-mono);font-weight:500;font-size:16px}
+.stat.hl{border-left-color:var(--accent)}
+
+/* inputs */
+details.grp{background:var(--raised);border:1px solid var(--line);border-radius:var(--r)}
+details.grp>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary h3::before{content:"▸";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
+details.grp[open]>summary h3::before{transform:rotate(90deg)}
+.rows{padding:0 14px 12px;display:flex;flex-direction:column}
+.rowhead{display:grid;grid-template-columns:1fr 7.2rem 5.2rem;gap:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--line)}
+.rowhead span:nth-child(2),.rowhead span:nth-child(3){text-align:right}
+.row{display:grid;grid-template-columns:1fr 7.2rem 5.2rem;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.row:last-child{border-bottom:0}
+.row label{min-width:0;font-size:13.5px}
+.row label small{display:block;font-size:11.5px;line-height:1.3}
+.row.wide{grid-template-columns:1fr minmax(0,13rem)}
+.val{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.val input[type=text]{width:100%;min-width:0;text-align:right}
+.u{font-size:11.5px;color:var(--muted);min-width:2.2em}
+input[type=text],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 7px;font-family:var(--f-mono);font-size:13.5px}
+select{font-family:var(--f-body);width:100%;min-width:0}
+input.err{border-color:var(--bad);background:var(--bad-soft)}
+.tol{display:flex;align-items:center;gap:3px}
+.tol span{color:var(--muted);font-size:12px}
+.tol input{width:100%;text-align:right}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+.row.bad label{color:var(--bad)}
+@media (max-width:420px){.row,.rowhead{grid-template-columns:1fr 6.4rem 4.6rem;gap:6px}}
+
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);padding:8px 12px;border-radius:4px;cursor:pointer;font-weight:500}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{padding:4px 8px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* tables */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:500;white-space:nowrap}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.grp td{background:var(--surface);font-family:var(--f-display);font-weight:600;font-size:13.5px;color:var(--muted)}
+tr.tot td{font-weight:600;border-top:2px solid var(--fg)}
+td input[type=text]{width:5.6rem;text-align:right;padding:4px 6px}
+td.pos{color:var(--good)} td.neg{color:var(--loss)}
+
+/* violations */
+.viol{display:flex;flex-direction:column;gap:6px}
+.viol div{color:var(--bad);font-size:13px;padding:6px 10px;border-left:3px solid var(--bad);background:var(--bad-soft);border-radius:0 4px 4px 0}
+.okmsg{color:var(--good);font-size:13px}
+
+/* CTM chain */
+.chain{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr) 4.6rem 4.4rem;gap:4px 10px;align-items:center;font-size:13px}
+.chain .h{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.chain .lbl{min-width:0}
+.chain .lbl small{display:block;font-size:11px}
+.barw{position:relative;height:16px;background:linear-gradient(to right,transparent calc(50% - .5px),var(--line) calc(50% - .5px),var(--line) calc(50% + .5px),transparent calc(50% + .5px))}
+.barw span{position:absolute;top:3px;height:10px;border-radius:2px}
+.barw span.g{left:50%;background:var(--good)}
+.barw span.l{right:50%;background:var(--loss)}
+.chain .v{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chain .sum{font-weight:600;border-top:1px solid var(--fg);padding-top:6px}
+@media (max-width:480px){.chain{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 4.2rem;}.chain .w{display:none}}
+
+/* drawing */
+.draw svg{width:100%;height:auto;display:block}
+.side-draw svg.main{max-height:74vh}
+svg text{fill:var(--dim);font-family:var(--f-mono)}
+svg .dim line,svg .dim path{stroke:var(--dim);fill:none}
+svg .dim polygon{fill:var(--dim)}
+svg .dim.bad line{stroke:var(--bad)} svg .dim.bad polygon{fill:var(--bad)} svg .dim.bad text{fill:var(--bad);font-weight:500}
+.c-frame{fill:var(--frame)} .c-glass{fill:var(--glass)} .c-cell{fill:var(--cell)} .c-bus{fill:var(--bus)}
+.c-wire{stroke:var(--cellwire)} .c-wiref{fill:var(--cellwire)}
+.c-rear{fill:none;stroke:var(--muted);stroke-dasharray:6 4}
+.c-badz{fill:var(--bad-soft);stroke:var(--bad)}
+.c-call{fill:none;stroke:var(--accent)} svg text.call{fill:var(--accent);font-weight:500}
+.details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px}
+.details figure{margin:0;border:1px solid var(--line);border-radius:4px;padding:6px;background:var(--surface)}
+.details figcaption{font-size:12px;color:var(--muted);padding:2px 4px 4px;font-family:var(--f-display);font-weight:600;letter-spacing:.04em}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:12px;height:10px;margin-right:5px;vertical-align:-1px;border-radius:2px;background:var(--sw)}
+
+/* histogram */
+.hist svg{width:100%;height:auto}
+.hist .bar{fill:var(--accent);opacity:.85}
+.hist .axis{stroke:var(--line)}
+.hist .mk{stroke:var(--bad);stroke-dasharray:4 3}
+.hist .mk2{stroke:var(--fg);stroke-dasharray:2 3}
+.hist text{font-size:10.5px}
+.pill{font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+.share{display:inline-block;height:8px;background:var(--accent);border-radius:2px;vertical-align:middle;opacity:.7}
+
+textarea{width:100%;min-height:9rem;resize:vertical;font-size:12.5px}
+.msg{font-size:13px;min-height:1.2em}
+.msg.ok{color:var(--good)} .msg.er{color:var(--bad)}
+.savedlist{display:flex;flex-direction:column;gap:6px}
+.saved{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.saved .nm{min-width:0}
+.saved .nm b{display:block;font-weight:600;overflow-wrap:anywhere}
+.saved .nm small{font-size:11.5px}
+.tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn);border:1px solid var(--warn);border-radius:3px;padding:0 4px;margin-left:4px}
+.lib details{border-top:1px solid var(--line)}
+.lib summary{cursor:pointer;padding:8px 0;font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap bar">
+    <div class="brand"><b>PV Modül Tasarım</b><span id="hdrName">–</span></div>
+    <div class="kpis" id="kpis"></div>
+  </div>
+  <nav class="wrap tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="tasarim">Tasarım</button>
+    <button class="tab" role="tab" data-tab="cizim">Çizim</button>
+    <button class="tab" role="tab" data-tab="ctm">CTM</button>
+    <button class="tab" role="tab" data-tab="tolerans">Tolerans</button>
+    <button class="tab" role="tab" data-tab="maliyet">Maliyet / BOM</button>
+    <button class="tab" role="tab" data-tab="karsilastir">Karşılaştır</button>
+    <button class="tab" role="tab" data-tab="kayit">Kayıt</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- TASARIM -->
+  <section class="panel" data-panel="tasarim">
+    <div class="design">
+      <div class="panel">
+        <div class="card">
+          <div class="cardhead"><h3>Modül yapısı şablonu</h3><small>Seçince tüm girdiler şablona göre yüklenir</small></div>
+          <div class="row wide" style="border:0;padding:0">
+            <label for="tplSel">Sektör örnekleri</label>
+            <select id="tplSel"></select>
+          </div>
+        </div>
+        <div class="card"><h3>Sonuç özeti</h3><div class="stats" id="sumStats"></div><div class="viol" id="violBox" style="margin-top:12px"></div></div>
+        <div id="inputsDesign" class="panel"></div>
+      </div>
+      <div class="side-draw card draw"><div class="cardhead"><h3>Üstten görünüm</h3><small>Ölçek gerçek · mm</small></div><div id="drawSide"></div></div>
+    </div>
+  </section>
+
+  <!-- ÇİZİM -->
+  <section class="panel" data-panel="cizim" hidden>
+    <div class="card draw">
+      <div class="cardhead"><h3>Teknik çizim · üstten görünüm</h3><small>Ölçüler mm · arka taraftaki parçalar kesikli</small></div>
+      <div class="legend" style="margin-bottom:8px">
+        <span style="--sw:var(--cell)">Hücre</span><span style="--sw:var(--cellwire)">Bağlantı teli</span><span style="--sw:var(--bus)">Bus ribbon</span><span style="--sw:var(--glass)">Cam</span><span style="--sw:var(--frame)">Çerçeve</span><span style="--sw:var(--bad)">Sınır ihlali</span>
+      </div>
+      <div id="drawMain"></div>
+    </div>
+    <div class="card"><h3>Detaylar</h3><div class="details" id="drawDetails"></div></div>
+    <div class="card"><h3>Sınır kontrolleri</h3><div class="viol" id="violBox2"></div></div>
+  </section>
+
+  <!-- CTM -->
+  <section class="panel" data-panel="ctm" hidden>
+    <div class="card"><div class="stats" id="ctmStats"></div></div>
+    <div class="card">
+      <div class="cardhead"><h3>CTM kayıp / kazanç zinciri</h3><small>Çarpımsal: P<sub>mod</sub> = ΣP<sub>hücre</sub> · Π k<sub>i</sub></small></div>
+      <div class="chain" id="chain"></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Elektriksel tahmin (STC)</h3><div class="tw"><table id="elecTbl"></table></div></div>
+      <div class="card"><h3>Hesap ayrıntıları</h3><div class="tw"><table id="ctmDetail"></table></div></div>
+    </div>
+    <div id="inputsCTM" class="panel"></div>
+    <div class="card">
+      <div class="cardhead"><h3>Ölçüm verisiyle kalibrasyon</h3><button class="btn sm" id="calSample">Örnek veri yükle</button></div>
+      <p class="note">Her satıra bir modül: <span class="mono">ΣHücre_W ; Modül_Pmax_W</span>. Yalnız modül Pmax girilirse hücre toplamı olarak nominal değer kullanılır. Ondalık ayırıcı virgül veya nokta olabilir.</p>
+      <textarea id="calData" placeholder="656,7 ; 631,2&#10;657,1 ; 632,8&#10;..."></textarea>
+      <div class="btns" style="margin-top:8px"><button class="btn" id="calRun">Kalibrasyonu hesapla</button><button class="btn pri" id="calApply" disabled>k_kal olarak uygula</button></div>
+      <div id="calOut" class="note" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- TOLERANS -->
+  <section class="panel" data-panel="tolerans" hidden>
+    <div id="inputsMC" class="panel"></div>
+    <div class="card">
+      <div class="cardhead"><h3>Monte Carlo tolerans analizi</h3><button class="btn pri" id="mcRun">Simülasyonu çalıştır</button></div>
+      <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Kenar mesafesi, cam ölçüsü, hücre bloğu uzunluğu ve lay-up kaçıklığından türetilir.</p>
+      <div id="mcOut" class="panel" style="margin-top:10px"><p class="note">Henüz çalıştırılmadı.</p></div>
+    </div>
+  </section>
+
+  <!-- MALİYET -->
+  <section class="panel" data-panel="maliyet" hidden>
+    <div class="card"><div class="stats" id="costStats"></div></div>
+    <div class="card">
+      <div class="cardhead"><h3>Malzeme listesi (BOM)</h3>
+        <div class="row wide" style="border:0;padding:0;min-width:200px"><label for="in-cur">Para birimi</label><select id="in-cur" data-k="cur"></select></div></div>
+      <p class="note">Fiyatlar sektör ortalamasına göre <b>örnek</b> değerlerdir; kendi tedarikçi fiyatlarınızı girin. Miktarlar geometriden hesaplanır. Tutar = miktar × birim fiyat × (1 + fire).</p>
+      <div class="tw"><table id="bomTbl"></table></div>
+    </div>
+    <div id="inputsCost" class="panel"></div>
+    <div class="card lib"><div class="cardhead"><h3>Bileşen kütüphanesi</h3><small id="libCount"></small></div>
+      <p class="note">Sektörde kullanılan BOM varyantları. Bir varyantı tasarıma uygulamak için Tasarım sekmesindeki ilgili seçim kutusunu kullanın.</p>
+      <div id="libBox"></div></div>
+  </section>
+
+  <!-- KARŞILAŞTIR -->
+  <section class="panel" data-panel="karsilastir" hidden>
+    <div class="card">
+      <div class="cardhead"><h3>Kayıtlı tasarımlar</h3><button class="btn pri" id="saveSlot">Mevcut tasarımı kaydet</button></div>
+      <p class="note">Karşılaştırmaya almak için işaretleyin; ◉ referans tasarımdır. Kayıtlar bu tarayıcıda tutulur. Kalıcı arşiv için Kayıt sekmesinden JSON indirin.</p>
+      <div class="savedlist" id="savedList"></div>
+    </div>
+    <div class="card"><h3>Fark tablosu</h3><div class="tw" id="cmpTbl"></div></div>
+    <div class="card"><h3>Farklı girdiler</h3><div class="tw" id="cmpDiff"></div></div>
+  </section>
+
+  <!-- KAYIT -->
+  <section class="panel" data-panel="kayit" hidden>
+    <div class="card">
+      <h3>Tasarım</h3>
+      <div class="row wide"><label for="in-name">Tasarım adı</label><input type="text" id="in-name" style="text-align:left;font-family:var(--f-body)"></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn pri dl" id="dlJson" hidden>JSON indir</button>
+        <button class="btn pri dl" id="dlXlsx" hidden>Excel'e aktar (.xlsx)</button>
+        <label class="btn" for="fileIn">JSON dosyası yükle</label><input type="file" id="fileIn" accept=".json,application/json" hidden>
+        <button class="btn" id="resetBtn">Varsayılana dön</button>
+      </div>
+      <p class="msg" id="dlNote"></p>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>JSON</h3><div class="btns"><button class="btn sm" id="jsonShow">Mevcut tasarımı göster</button><button class="btn sm" id="jsonCopy">Kopyala</button><button class="btn sm" id="jsonLoad">Bu JSON'u yükle</button></div></div>
+      <textarea id="jsonBox" spellcheck="false" style="min-height:14rem"></textarea>
+      <p class="msg" id="jsonMsg"></p>
+    </div>
+    <div class="card note">
+      <h3 style="color:var(--fg)">Model notları</h3>
+      <p>Bu sayfa masaüstü uygulamasının prototipidir. Hesap motoru ayrı bir blokta tutuldu ve Python'a birebir taşınacak. Ön yüz STC gücü hesaplanır; bifasiyal arka yüz kazancı modellenmez. Varsayılan katsayılar tipik değerlerdir. Kendi CTM ölçümlerinizle CTM sekmesinden kalibre edin.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ================= HESAP MOTORU (arayüzden bağımsız) ================= -->
+<script id="engine">
+"use strict";
+/* ---- Bileşen kütüphanesi: sektördeki BOM varyantları ---- */
+const LIB = {};
+const mk=(arr,fn)=>Object.fromEntries(arr.map(fn));
+const n10=x=>Math.round(x*10),n100=x=>Math.round(x*100);
+const fx=(x,d)=>x.toFixed(d).replace('.',',');
+/* Wafer / hücre formatları (pah: psödo-kare köşe üçgeni kenarı, wafer çapından) */
+LIB.fmt={l:'Wafer / hücre formatı',items:{
+  f125:{l:'125×125 (5 inç) psödo-kare',spec:'çok eski tip, Ø165',a:125,b:125,ch:8.65},
+  f156sq:{l:'M0 156×156 tam kare (multi)',spec:'eski tip multi',a:156,b:156,ch:0},
+  f156m0:{l:'M0 156×156 psödo-kare (mono)',spec:'eski tip mono, Ø200',a:156,b:156,ch:15.4},
+  m1:{l:'M1 156,75×156,75 psödo-kare',spec:'Ø205',a:156.75,b:156.75,ch:12.3},
+  m2:{l:'M2 156,75×156,75 psödo-kare',spec:'Ø210, 2016–19',a:156.75,b:156.75,ch:8.5},
+  m2sq:{l:'M2 156,75×156,75 tam kare (multi)',spec:'2016–19 multi',a:156.75,b:156.75,ch:0},
+  g1:{l:'G1 158,75×158,75',spec:'Ø223, 2019–20',a:158.75,b:158.75,ch:1.1},
+  m4:{l:'M4 161,7×161,7 psödo-kare',spec:'Ø211, 2019',a:161.7,b:161.7,ch:13.1},
+  m6:{l:'M6 166×166 psödo-kare',spec:'Ø223, 2020–21',a:166,b:166,ch:8.5},
+  m10:{l:'M10 182×182 psödo-kare',spec:'Ø247, 2021–23',a:182,b:182,ch:7.5},
+  m10r:{l:'M10R 182,2×183,75 tam kare',spec:'2023 →',a:182.2,b:183.75,ch:0},
+  r191:{l:'182,2×191,6 dikdörtgen (210R-191)',spec:'2023 →',a:182.2,b:191.6,ch:0},
+  g12r:{l:'G12R 182,2×210 dikdörtgen (210R)',spec:'2023 →',a:182.2,b:210,ch:0},
+  g12:{l:'G12 210×210',spec:'Ø295, 2020 →',a:210,b:210,ch:1.4}}};
+/* Hücre teknolojileri: verim, Voc, Jsc (mA/cm²), Jmp/Jsc, kalınlık (µm), fiyat ($/W) */
+LIB.tech={l:'Hücre teknolojisi',items:{
+  bsf_mc:{l:'Al-BSF multi (mc-Si)',spec:'p-tipi, 2–4BB, eski tip',cat:'Al-BSF',eta:18.5,Voc:0.636,Jsc:36.9,jmp:0.945,th:190,price:0.022},
+  bsf_mono:{l:'Al-BSF mono (Cz)',spec:'p-tipi, 3–5BB, eski tip',cat:'Al-BSF',eta:19.8,Voc:0.645,Jsc:38.5,jmp:0.945,th:190,price:0.025},
+  perc_mc:{l:'PERC multi (black-Si)',spec:'p-tipi, 5BB',cat:'PERC',eta:20.5,Voc:0.660,Jsc:38.5,jmp:0.945,th:180,price:0.026},
+  perc:{l:'PERC mono (tek yüz)',spec:'p-tipi, 5BB–MBB',cat:'PERC',eta:23.0,Voc:0.690,Jsc:41.2,jmp:0.948,th:160,price:0.030},
+  perc_bi:{l:'PERC mono bifasiyal',spec:'p-tipi, bifasiyallik ~%70',cat:'PERC',eta:22.9,Voc:0.690,Jsc:41.0,jmp:0.948,th:160,price:0.031},
+  pert:{l:'n-PERT bifasiyal',spec:'n-tipi, bifasiyallik ~%85',cat:'PERT',eta:22.0,Voc:0.670,Jsc:40.5,jmp:0.948,th:170,price:0.034},
+  mwt:{l:'MWT (metal wrap-through)',spec:'önde busbar yok, iletken backsheet',cat:'MWT',eta:22.5,Voc:0.685,Jsc:41.0,jmp:0.948,th:170,price:0.035},
+  topcon:{l:'TOPCon n-tipi',spec:'16–20BB, bifasiyallik ~%80',cat:'TOPCon',eta:26.0,Voc:0.728,Jsc:42.0,jmp:0.952,th:130,price:0.040},
+  topcon0bb:{l:'TOPCon 0BB (busbarsız)',spec:'film/nokta yapıştırma',cat:'TOPCon',eta:26.3,Voc:0.730,Jsc:42.2,jmp:0.952,th:130,price:0.041},
+  hjt:{l:'HJT heteroeklem',spec:'n-tipi, düşük sıcaklık, bifasiyallik ~%90',cat:'HJT',eta:26.2,Voc:0.750,Jsc:40.3,jmp:0.955,th:110,price:0.048},
+  hjt_cu:{l:'HJT bakır kaplama (Cu plating)',spec:'gümüşsüz metalizasyon',cat:'HJT',eta:26.3,Voc:0.751,Jsc:40.4,jmp:0.955,th:110,price:0.046},
+  bc:{l:'Arka kontaklı BC (HPBC / ABC / TBC / IBC)',spec:'önde metal yok',cat:'BC',eta:27.0,Voc:0.740,Jsc:42.5,jmp:0.952,th:130,price:0.050},
+  tandem:{l:'Perovskit/Si tandem (pilot)',spec:'Ar-Ge, iki terminal',cat:'Tandem',eta:29.0,Voc:1.900,Jsc:19.5,jmp:0.940,th:130,price:0.120}}};
+for(const it of Object.values(LIB.tech.items))it.spec+=` · η ${fx(it.eta,1)} %, Voc ${fx(it.Voc,3)} V, Jsc ${fx(it.Jsc,1)} mA/cm², ${it.th} µm`;
+for(const it of Object.values(LIB.fmt.items))it.spec=`${fx(it.a,2)}×${fx(it.b,2)} mm, pah ${fx(it.ch,1)} mm · `+it.spec;
+/* Hücre bağlantı teli / ribbon */
+LIB.wire={l:'Hücre bağlantı teli / ribbon',items:Object.assign(
+  mk([[0.16,'0BB / 24BB+'],[0.18,'0BB / 20BB+'],[0.20,'18–20BB'],[0.22,'16–18BB'],[0.24,'16BB'],[0.26,'12–16BB'],[0.28,'12BB'],[0.30,'MBB 10–12BB'],[0.32,'MBB 10BB'],[0.35,'MBB 9BB'],[0.40,'MBB 6–9BB (ilk nesil)']],
+    ([d,s])=>['r'+n100(d),{l:`Yuvarlak tel Ø${fx(d,2)} mm`,spec:s,set:{wt:'round',dw:d},price:+(11+(0.4-d)*8).toFixed(2)}]),
+  mk([[0.20,'0BB'],[0.22,'0BB'],[0.25,'0BB / MBB']],([d,s])=>['t'+n100(d),{l:`Üçgen kesitli tel ${fx(d,2)} mm`,spec:s+', ışığı hücreye yönlendirir',set:{wt:'tri',dw:d},price:14}]),
+  {seg26:{l:'Segment tel Ø0,26 mm (aralıkta yassılaştırılmış)',spec:'paving / sıfır aralık dizilim',set:{wt:'round',dw:0.26},price:13.5}},
+  mk([[0.6,0.20,'12BB yassı'],[0.7,0.20,'MBB yassı'],[0.8,0.20,'6BB'],[0.8,0.25,'6BB'],[0.9,0.20,'5BB / MBB'],[0.9,0.23,'5BB'],[1.0,0.20,'4–5BB'],[1.0,0.25,'4BB'],[1.2,0.20,'4BB'],[1.2,0.25,'4–5BB'],[1.5,0.15,'3BB'],[1.5,0.20,'3BB'],[1.6,0.20,'3BB'],[2.0,0.15,'2BB'],[2.0,0.18,'2BB'],[2.0,0.20,'2BB']],
+    ([w,t,s])=>[`f${n10(w)}x${n100(t)}`,{l:`Yassı ribbon ${fx(w,1)}×${fx(t,2)} mm`,spec:s,set:{wt:'flat',dw:w,tr:t},price:10.5}]),
+  mk([[1.2,0.20],[1.5,0.20]],([w,t])=>[`s${n10(w)}x${n100(t)}`,{l:`Yapılı (LHS) ribbon ${fx(w,1)}×${fx(t,2)} mm`,spec:'3–4BB, desenli yüzey ışığı geri yansıtır',set:{wt:'struct',dw:w,tr:t},price:12}]))};
+LIB.coat={l:'Tel / ribbon kaplaması',items:{
+  snpb:{l:'Sn60Pb40 kaplama',spec:'standart IR lehim, 183–190 °C',set:{kc:1.05},add:0},
+  snpbag:{l:'Sn62Pb36Ag2 kaplama',spec:'gümüş katkılı lehim',set:{kc:1.05},add:0.8},
+  snbi:{l:'Sn42Bi58 düşük sıcaklık',spec:'HJT, 138 °C',set:{kc:1.07},add:1.5},
+  snbiag:{l:'SnBiAg düşük sıcaklık',spec:'HJT, yorulma dayanımı yüksek',set:{kc:1.07},add:2.0},
+  pbfree:{l:'Kurşunsuz SnAgCu / SnCu',spec:'RoHS uyumlu',set:{kc:1.04},add:1.2},
+  bare:{l:'Çıplak Cu / Ag kaplı Cu',spec:'ECA veya 0BB film ile',set:{kc:1.00},add:-0.5}}};
+LIB.join={l:'Bağlantı yöntemi',items:{
+  ir:{l:'Kızılötesi (IR) lehim',spec:'flux kullanılır',flux:true,cost:0},
+  ind:{l:'İndüksiyon / sıcak hava lehim',spec:'flux kullanılır',flux:true,cost:0},
+  lt:{l:'Düşük sıcaklık lehim',spec:'HJT, flux kullanılır',flux:true,cost:0},
+  film:{l:'0BB taşıyıcı film',spec:'lehimsiz, laminasyonda bağlanır',flux:false,cost:0.35},
+  dot:{l:'0BB nokta yapıştırıcı (UV/ısıl kür)',spec:'lehimsiz',flux:false,cost:0.25},
+  eca:{l:'İletken yapıştırıcı (ECA)',spec:'HJT / shingle, gümüş dolgulu',flux:false,cost:0.60}}};
+LIB.bus={l:'Bus ribbon',items:Object.assign(
+  mk([[3,0.30],[4,0.30],[4,0.40],[5,0.30],[5,0.35],[5,0.40],[6,0.30],[6,0.40],[6,0.50],[8,0.30],[8,0.40],[10,0.40],[10,0.50]],
+    ([w,t])=>[`b${w}x${n100(t)}`,{l:`Bus ribbon ${w}×${fx(t,2)} mm`,spec:w>=8?'yüksek akım':w<=4?'dar kenar tasarımı':'',set:{bw:w,bt:t},price:11}]),
+  {b5x35n:{l:'Bus ribbon 5×0,35 mm, çentikli',spec:'termal gerilme giderici',set:{bw:5,bt:0.35},price:12}})};
+LIB.insul={l:'Bus yalıtım şeridi',items:{
+  epe:{l:'EPE köpük şerit',spec:'',price:0.05},pet:{l:'PET film şerit',spec:'',price:0.04},
+  tpt:{l:'TPT şerit',spec:'eski tip',price:0.08},evapet:{l:'EVA + PET kompozit şerit',spec:'',price:0.06}}};
+LIB.flux={l:'Lehim flux’ı',items:{
+  nc:{l:'No-clean, düşük katı oranlı',spec:'',price:8},rma:{l:'Alkol bazlı RMA',spec:'eski tip',price:7}}};
+/* Ön cam */
+LIB.glassF={l:'Ön cam',items:{}};
+for(const [t,base] of [[1.6,2.7],[2.0,3.0],[2.5,3.5],[2.8,3.8],[3.2,4.0],[4.0,5.0]]){
+  const tmp=t<=2.5?'yarı temperli':'tam temperli',k=n10(t);
+  LIB.glassF.items['g'+k+'ar']={l:`${fx(t,1)} mm ${tmp}, AR kaplı`,spec:'düşük demirli, desenli',set:{tgf:t,ar:true,Rf:1.5},price:+(base+0.3).toFixed(2)};
+  if(t===2.0||t===3.2)LIB.glassF.items['g'+k+'ar2']={l:`${fx(t,1)} mm ${tmp}, çift katman AR`,spec:'daha düşük yansıma',set:{tgf:t,ar:true,Rf:1.2},price:+(base+0.5).toFixed(2)};
+  LIB.glassF.items['g'+k+'no']={l:`${fx(t,1)} mm ${tmp}, AR kaplamasız`,spec:'desenli (prizmatik)',set:{tgf:t,ar:false},price:base};
+}
+/* Arka katman: arka cam ve backsheet */
+LIB.rear={l:'Arka katman',items:{}};
+for(const [t,base] of [[1.6,2.7],[2.0,3.0],[2.5,3.5],[3.2,4.0]]){const k=n10(t);
+  LIB.rear.items['gc'+k]={l:`${fx(t,1)} mm arka cam, şeffaf`,spec:'en yüksek bifasiyallik, J-box delikli',kind:'glass',Rb:0.08,set:{tgr:t},price:base};
+  LIB.rear.items['gr'+k]={l:`${fx(t,1)} mm arka cam, beyaz sırlı grid`,spec:'gap bölgesi beyaz baskı',kind:'glass',Rb:0.75,set:{tgr:t},price:+(base+0.4).toFixed(2)};
+  LIB.rear.items['gb'+k]={l:`${fx(t,1)} mm arka cam, siyah sırlı (all-black)`,spec:'estetik',kind:'glass',Rb:0.05,set:{tgr:t},price:+(base+0.5).toFixed(2)};}
+Object.assign(LIB.rear.items,{
+  bsKPK:{l:'Backsheet KPK (PVDF/PET/PVDF)',spec:'beyaz, florlu',kind:'bs',Rb:0.80,set:{bsg:480},price:2.6},
+  bsKPf:{l:'Backsheet KPf (PVDF/PET/F-kaplama)',spec:'beyaz',kind:'bs',Rb:0.80,set:{bsg:450},price:2.0},
+  bsKPC:{l:'Backsheet KPC (PVDF/PET/kaplama)',spec:'beyaz',kind:'bs',Rb:0.80,set:{bsg:440},price:1.9},
+  bsKPE:{l:'Backsheet KPE (PVDF/PET/PE)',spec:'eski tip, iç katman PE',kind:'bs',Rb:0.80,set:{bsg:430},price:2.0},
+  bsTPT:{l:'Backsheet TPT (PVF/PET/PVF)',spec:'beyaz, Tedlar',kind:'bs',Rb:0.80,set:{bsg:470},price:3.0},
+  bsTPE:{l:'Backsheet TPE (PVF/PET/EVA-PE)',spec:'eski tip, iç katman PE',kind:'bs',Rb:0.80,set:{bsg:430},price:2.2},
+  bsCPC:{l:'Backsheet CPC (kaplama/PET/kaplama)',spec:'beyaz, ince florlu kaplama',kind:'bs',Rb:0.78,set:{bsg:420},price:1.6},
+  bsPPE:{l:'Backsheet PPE / florsuz PET',spec:'beyaz, düşük maliyet',kind:'bs',Rb:0.78,set:{bsg:400},price:1.3},
+  bsPO:{l:'Backsheet tam poliolefin (PO / PP)',spec:'florsuz, PET’siz',kind:'bs',Rb:0.78,set:{bsg:420},price:1.8},
+  bsPA:{l:'Backsheet poliamid (AAA)',spec:'tarihi; sahada çatlama sorunu bilinir',kind:'bs',Rb:0.80,set:{bsg:420},price:1.7},
+  bsBLK:{l:'Siyah backsheet (all-black)',spec:'estetik',kind:'bs',Rb:0.05,set:{bsg:460},price:2.4},
+  bsTR:{l:'Şeffaf backsheet (bifasiyal)',spec:'',kind:'bs',Rb:0.12,set:{bsg:430},price:2.8},
+  bsTRG:{l:'Şeffaf grid backsheet (bifasiyal)',spec:'gap bölgesi beyaz baskı',kind:'bs',Rb:0.55,set:{bsg:440},price:3.0},
+  bsMWT:{l:'İletken backsheet (MWT)',spec:'devre baskılı, MWT hücre için',kind:'bs',Rb:0.80,set:{bsg:600},price:6.0}});
+/* Enkapsülan: rb = arka yüzde gap yansıtması (beyaz/siyah) */
+LIB.enc={l:'Enkapsülan',items:{
+  EVA:{l:'EVA hızlı kür (UV-cut)',spec:'standart',rho:0.95,T:99.0,price:1.9},
+  EVAold:{l:'EVA yavaş kür (eski tip)',spec:'UV emici, 15–20 dk laminasyon',rho:0.95,T:98.6,price:1.8},
+  EVAUVT:{l:'EVA UV-geçirgen (UVT)',spec:'ön yüz, kısa dalga kazancı',rho:0.95,T:99.5,price:2.0},
+  EVAHT:{l:'EVA yüksek geçirgenlik',spec:'ön yüz',rho:0.95,T:99.3,price:2.0},
+  EVAPID:{l:'Anti-PID EVA',spec:'yüksek hacim direnci',rho:0.95,T:99.0,price:2.1},
+  POE:{l:'POE',spec:'PID direnci yüksek, 0,88 g/cm³',rho:0.88,T:99.3,price:3.0},
+  EPE:{l:'EPE (EVA/POE/EVA ko-ekstrüzyon)',spec:'POE ile EVA arası',rho:0.92,T:99.2,price:2.5},
+  UVDC:{l:'UV dönüşüm (down-conversion) POE',spec:'UV→görünür, TOPCon',rho:0.89,T:100.3,price:3.4},
+  UVDCE:{l:'UV dönüşüm EPE',spec:'UV→görünür',rho:0.92,T:100.2,price:2.9},
+  TPO:{l:'TPO (termoplastik poliolefin)',spec:'kürsüz, geri dönüştürülebilir',rho:0.89,T:99.3,price:3.2},
+  ION:{l:'İyonomer',spec:'ince film / cam-cam, nem bariyeri',rho:0.95,T:99.4,price:6.0},
+  PVB:{l:'PVB',spec:'BIPV cam-cam, emniyet camı',rho:1.07,T:98.8,price:4.0},
+  SIL:{l:'Silikon enkapsülan',spec:'tarihi / uzay, yüksek UV dayanımı',rho:1.00,T:99.6,price:15},
+  EVAW:{l:'Beyaz EVA (yalnız arka)',spec:'yansıtıcı arka katman',rho:0.98,T:0,rb:0.85,price:2.2},
+  EPEW:{l:'Beyaz EPE (yalnız arka)',spec:'yansıtıcı, PID dirençli',rho:0.95,T:0,rb:0.85,price:2.7},
+  POEW:{l:'Beyaz POE (yalnız arka)',spec:'yansıtıcı',rho:0.92,T:0,rb:0.85,price:3.2},
+  EVAB:{l:'Siyah EVA (yalnız arka)',spec:'all-black estetik',rho:0.98,T:0,rb:0.05,price:2.4}}};
+/* J-box gövdesi, kablo, konnektör */
+LIB.jbox={l:'J-box gövdesi',items:{
+  split25:{l:'3 parçalı split, 25 A',spec:'IP68, M6/M10',set:{nJB:3},price:1.4},
+  split30:{l:'3 parçalı split, 30 A',spec:'IP68, M10/G12R',set:{nJB:3},price:1.5},
+  split35:{l:'3 parçalı split, 35 A',spec:'IP68, G12',set:{nJB:3},price:1.7},
+  split40:{l:'3 parçalı split, 40 A',spec:'IP68, yüksek akım G12',set:{nJB:3},price:1.9},
+  edge:{l:'Kenar tipi split (cam-cam)',spec:'kenara monte, ince profil',set:{nJB:3},price:2.0},
+  one3:{l:'Tek parça, 3 diyot',spec:'klasik 60/72 hücre',set:{nJB:1},price:1.4},
+  one2:{l:'Tek parça, 2 diyot',spec:'36 hücre (12 V)',set:{nJB:1},price:1.1},
+  one4:{l:'Tek parça, 4 diyot / 6 giriş',spec:'eski tip 96 hücre',set:{nJB:1},price:1.7},
+  rsd:{l:'Hızlı kapatma (rapid shutdown) entegre',spec:'NEC 690.12',set:{nJB:1},price:9.0},
+  smart:{l:'Akıllı J-box (optimizer entegre)',spec:'MLPE, izleme',set:{nJB:1},price:18.0}}};
+LIB.cable={l:'Solar kablo (H1Z2Z2-K)',items:{}};
+for(const [A,pm] of [[2.5,0.45],[4,0.60],[6,0.85]])for(const L of [300,350,400,900,1000,1200,1400])
+  LIB.cable.items[`c${n10(A)}_${L}`]={l:`${fx(A,1)} mm² × ${L} mm (her kutup)`,spec:L>=900?'dikey montaj / eski tip':'yatay montaj',set:{cabA:A,cabL:L},price:pm};
+LIB.conn={l:'Konnektör',items:{
+  mc4c:{l:'MC4 uyumlu (genel)',spec:'1500 V',set:{conR:0.5},price:0.25},
+  stb:{l:'Stäubli MC4',spec:'orijinal',set:{conR:0.3},price:1.0},
+  evo2:{l:'Stäubli MC4-EVO2',spec:'1500 V, orijinal',set:{conR:0.3},price:1.2},
+  h4:{l:'Amphenol H4',spec:'1500 V',set:{conR:0.35},price:0.9},
+  te:{l:'TE Connectivity SOLARLOK',spec:'',set:{conR:0.4},price:0.8}}};
+LIB.pot={l:'J-box potting',items:{
+  si2k:{l:'2K silikon',spec:'standart',price:6.0},si1k:{l:'1K silikon',spec:'nem kürlenen',price:4.5},
+  pu:{l:'Poliüretan',spec:'',price:5.0},none:{l:'Yok (contalı kutu)',spec:'eski tip',price:0}}};
+/* Çerçeve */
+LIB.frame={l:'Çerçeve',items:{none:{l:'Çerçevesiz (cam-cam)',spec:'kenar koruma ile',set:{fc:0,fkg:0},price:0}}};
+for(const [h,kg,fc] of [[25,0.36,3],[30,0.42,3],[33,0.46,3],[35,0.50,3],[40,0.60,3],[45,0.68,3],[50,0.80,3.5]]){
+  LIB.frame.items['al'+h]={l:`Al 6063-T5, ${h} mm, gümüş eloksal`,spec:h>=40?'eski tip / yüksek yük':'',set:{fc,fkg:kg},price:4.6};
+  LIB.frame.items['al'+h+'b']={l:`Al 6063-T5, ${h} mm, siyah eloksal`,spec:'all-black',set:{fc,fkg:kg},price:5.0};}
+Object.assign(LIB.frame.items,{
+  al35t6:{l:'Al 6005-T6, 35 mm',spec:'yüksek dayanım',set:{fc:3,fkg:0.50},price:4.9},
+  st30:{l:'Çelik Zn-Al-Mg kaplı, 30 mm',spec:'düşük karbon/maliyet',set:{fc:3,fkg:0.62},price:1.6},
+  st35:{l:'Çelik Zn-Al-Mg kaplı, 35 mm',spec:'',set:{fc:3,fkg:0.70},price:1.6},
+  cmp35:{l:'Kompozit (PU / cam elyafı), 35 mm',spec:'metalsiz, topraklama gerekmez',set:{fc:3,fkg:0.35},price:3.8}});
+LIB.fseal={l:'Çerçeve yapıştırma',items:{
+  sil:{l:'1K silikon (çerçeve oluğu)',spec:'nem kürlenen',unit:'kg',price:4.0},
+  ms:{l:'MS polimer hibrit yapıştırıcı',spec:'',unit:'kg',price:5.0},
+  tape:{l:'Çift taraflı köpük bant',spec:'hızlı montaj',unit:'m',price:0.12}}};
+LIB.edge={l:'Kenar koruma (çerçevesiz)',items:{
+  none:{l:'Yok',spec:'',price:0},
+  tape:{l:'Kenar koruma bandı',spec:'cam kenarı boyunca',unit:'m',price:0.10},
+  butyl:{l:'Butil kenar sızdırmazlığı',spec:'cam-cam nem bariyeri',unit:'m',price:0.25},
+  corner:{l:'Plastik köşe koruyucu ×4',spec:'',unit:'adet',price:0.05}}};
+LIB.pack={l:'Ambalaj tipi',items:{
+  vert:{l:'Dikey: karton + ahşap palet',spec:'',set:{nPal:36},pal:14,car:9,str:2.5},
+  horiz:{l:'Yatay: karton + ahşap palet',spec:'eski tip',set:{nPal:30},pal:12,car:10,str:2.5},
+  crate:{l:'Ahşap kasa (ihracat)',spec:'',set:{nPal:30},pal:35,car:2,str:2},
+  rack:{l:'Geri dönüşlü çelik raf (iç pazar)',spec:'amortismanlı',set:{nPal:40},pal:4,car:1,str:0.5}}};
+const TECHS=['Al-BSF','PERC','PERT','MWT','TOPCon','HJT','BC','Tandem'];
+/* Format × teknoloji → hücre parametreleri. etaOv verilirse akım/gerilim orantılı ölçeklenir */
+function cellFrom(p,etaOv){
+  const F=LIB.fmt.items[p.fmtV],T=LIB.tech.items[p.techV];if(!F||!T)return;
+  p.a=F.a;p.b=F.b;p.ch=F.ch;p.tech=T.cat;
+  const A=cellAreaCm2(p),eta=etaOv||T.eta,k=eta/T.eta;
+  p.eta=+eta.toFixed(3);p.P=+(eta/100*A*0.1).toFixed(3);
+  p.Voc=+(T.Voc*Math.pow(k,0.4)).toFixed(4);p.Isc=+(T.Jsc*A/1000*Math.pow(k,0.6)).toFixed(3);p.Imp=+(T.Jsc*A/1000*T.jmp*Math.pow(k,0.6)).toFixed(3);
+  p.mc=+(A*T.th*1e-4*2.33+0.3).toFixed(2);
+}
+
+/* ---- Parametre şeması: grup, etiket, birim, varsayılan, tolerans ---- */
+const S_=(k,g,l,u,v,o={})=>Object.assign({k,g,l,u,v},o);
+const SCHEMA=[
+  // Hücre
+  S_('fmtV','cell','Wafer / hücre formatı','','g12r',{type:'lib',lib:'fmt'}),
+  S_('techV','cell','Hücre teknolojisi (hazır)','','topcon',{type:'lib',lib:'tech',hint:'Format ile birlikte verim, Voc, Isc, Imp ve kütleyi doldurur'}),
+  S_('tech','cell','Teknoloji sınıfı','','TOPCon',{type:'sel',opts:TECHS.map(t=>[t,t]),hint:'BC ve MWT: önde tel gölgesi yok'}),
+  S_('a','cell','Hücre genişliği','mm',182.2,{tol:0.2,min:50}),
+  S_('b','cell','Hücre boyu','mm',210,{tol:0.2,min:50}),
+  S_('ch','cell','Köşe pahı (kenar)','mm',0,{min:0,hint:'Tam kare için 0'}),
+  S_('eta','cell','Hücre verimi','%',26.0,{min:1,max:40,hint:'Pmax ile bağlı'}),
+  S_('P','cell','Hücre Pmax (tam hücre)','W',9.95,{min:0.1}),
+  S_('Voc','cell','Hücre Voc','V',0.728,{min:0.1}),
+  S_('Isc','cell','Hücre Isc','A',16.30,{min:0.1}),
+  S_('Imp','cell','Hücre Imp','A',15.79,{min:0.1}),
+  S_('mc','cell','Hücre kütlesi','g',12.0,{min:0}),
+  S_('sP','cell','Lot güç saçılımı σ','%',0.30,{min:0,hint:'Monte Carlo'}),
+  S_('cvI','cell','Bin içi Isc değişkenliği (CV)','%',1.5,{min:0}),
+  // Dizilim
+  S_('half','lay','Half-cut (yarım hücre)','',true,{type:'bool'}),
+  S_('nc','lay','String (sütun) sayısı','adet',6,{int:1,min:1,max:40}),
+  S_('nr','lay','Sütun başına hücre parçası','adet',22,{int:1,min:1,max:200,hint:'Half-cut: üst + alt toplam'}),
+  S_('gc','lay','Hücre arası boşluk','mm',1.0,{tol:0.3,min:-1}),
+  S_('gs','lay','String aralığı','mm',2.5,{tol:0.5,min:0}),
+  S_('gm','lay','Orta boşluk (half-cut)','mm',6.0,{tol:0.5,min:0}),
+  S_('eL','lay','Üst/alt kenar mesafesi','mm',20.0,{min:0,hint:'Cam kenarı → hücre'}),
+  S_('eW','lay','Yan kenar mesafesi','mm',11.15,{min:0,hint:'Cam kenarı → hücre'}),
+  S_('pl','lay','Lay-up konum kaçıklığı','mm',0,{tol:1.0,hint:'Nominal 0; toleransı MC kenar mesafesine yansır'}),
+  // Bağlantı
+  S_('wireV','int','Tel / ribbon (hazır)','','r24',{type:'lib',lib:'wire'}),
+  S_('coatV','int','Tel kaplaması','','snpb',{type:'lib',lib:'coat'}),
+  S_('joinV','int','Bağlantı yöntemi','','ir',{type:'lib',lib:'join'}),
+  S_('nbb','int','Busbar (tel) sayısı','adet',16,{int:1,min:1,max:40}),
+  S_('wt','int','Tel kesiti','','round',{type:'sel',opts:[['round','Yuvarlak'],['tri','Üçgen'],['flat','Yassı'],['struct','Yapılı (LHS) yassı']]}),
+  S_('dw','int','Tel çapı / ribbon genişliği','mm',0.24,{tol:0.01,min:0.05}),
+  S_('tr','int','Ribbon kalınlığı (yassı)','mm',0.20,{min:0.05}),
+  S_('wpad','int','Hücredeki baskı busbar genişliği','mm',0.05,{min:0,hint:'Hücre ölçümünde zaten gölgede'}),
+  S_('ov','int','Tel uç boşluğu (hücre kenarına)','mm',2.5,{min:0}),
+  S_('busV','int','Bus ribbon (hazır)','','b5x35',{type:'lib',lib:'bus'}),
+  S_('insV','int','Bus yalıtım şeridi','','epe',{type:'lib',lib:'insul'}),
+  S_('bw','int','Bus ribbon genişliği','mm',5,{min:0.5}),
+  S_('bt','int','Bus ribbon kalınlığı','mm',0.35,{min:0.05}),
+  S_('bg','int','Bus ribbon – hücre mesafesi','mm',3.0,{min:0}),
+  S_('lead','int','J-box çıkış ribbon boyu','mm',25,{min:0}),
+  // Cam ve katmanlar
+  S_('glassFV','mat','Ön cam (hazır)','','g20ar',{type:'lib',lib:'glassF'}),
+  S_('tgf','mat','Ön cam kalınlığı','mm',2.0,{tol:0.1,min:0.5}),
+  S_('ar','mat','Ön camda AR kaplama','',true,{type:'bool'}),
+  S_('rearV','mat','Arka katman (hazır)','','gr20',{type:'lib',lib:'rear'}),
+  S_('tgr','mat','Arka cam kalınlığı','mm',2.0,{tol:0.1,min:0}),
+  S_('bsg','mat','Backsheet birim kütlesi','g/m²',450,{min:0}),
+  S_('encFV','mat','Ön enkapsülan','','EPE',{type:'lib',lib:'enc',filter:it=>it.rb===undefined}),
+  S_('tef','mat','Ön enkapsülan kalınlığı','mm',0.50,{min:0.1}),
+  S_('Tf','mat','Ön enkapsülan etkin geçirgenlik','%',99.2,{min:80,max:105}),
+  S_('encRV','mat','Arka enkapsülan','','POE',{type:'lib',lib:'enc'}),
+  S_('ter','mat','Arka enkapsülan kalınlığı','mm',0.45,{min:0.1}),
+  S_('Rb','mat','Gap bölgesi arka yansıtma','–',0.75,{min:0,max:1,hint:'Arka katman / beyaz enkapsülan seçimiyle güncellenir'}),
+  // Çerçeve ve J-box
+  S_('frameV','fr','Çerçeve (hazır)','','al30',{type:'lib',lib:'frame'}),
+  S_('fc','fr','Çerçeve kenar payı (cam → dış)','mm',3.0,{min:0}),
+  S_('fkg','fr','Çerçeve birim kütlesi','kg/m',0.42,{min:0}),
+  S_('fsealV','fr','Çerçeve yapıştırma','','sil',{type:'lib',lib:'fseal'}),
+  S_('sil','fr','Silikon tüketimi','g/m',15,{min:0}),
+  S_('edgeV','fr','Kenar koruma (çerçevesiz)','','none',{type:'lib',lib:'edge'}),
+  S_('jboxV','fr','J-box gövdesi','','split30',{type:'lib',lib:'jbox'}),
+  S_('cableV','fr','Solar kablo (hazır)','','c40_300',{type:'lib',lib:'cable'}),
+  S_('connV','fr','Konnektör','','mc4c',{type:'lib',lib:'conn'}),
+  S_('potV','fr','J-box potting','','si2k',{type:'lib',lib:'pot'}),
+  S_('nJB','fr','J-box parça sayısı','adet',3,{int:1,min:1,max:3}),
+  S_('cabL','fr','Kablo boyu (her kutup)','mm',300,{min:0}),
+  S_('cabA','fr','Kablo kesiti','mm²',4,{min:1}),
+  S_('potG','fr','Potting silikonu (kutu başı)','g',20,{min:0}),
+  S_('jbAdhG','fr','J-box yapıştırma silikonu','g',15,{min:0}),
+  S_('jbm','fr','J-box takımı kütlesi','kg',0.30,{min:0}),
+  // Sınırlar
+  S_('eMin','lim','Min. kenar mesafesi (gerilimli parça)','mm',10,{min:0}),
+  S_('gcMin','lim','Min. hücre arası boşluk','mm',0.5),
+  S_('gsMin','lim','Min. string aralığı','mm',1.5),
+  S_('gmMin','lim','Min. orta boşluk','mm',3.0),
+  S_('Lmax','lim','Maks. modül boyu','mm',2384,{min:0}),
+  S_('Wmax','lim','Maks. modül genişliği','mm',1136,{min:0}),
+  // CTM katsayıları
+  S_('dCut','ctm','Kesme (LSC/TLS) kaybı','%',0.30,{min:0}),
+  S_('Rf','ctm','Ön cam yansıması (AR’li)','%',1.5,{min:0}),
+  S_('RfNo','ctm','Ön cam yansıması (AR’siz)','%',4.0,{min:0}),
+  S_('aG','ctm','Cam soğurma katsayısı α','1/mm',0.002,{min:0}),
+  S_('Gim','ctm','İndeks uyumu kazancı G_IM','%',2.0),
+  S_('fy','ctm','Gap ışık yakalama oranı f_yak','–',0.30,{min:0,max:1}),
+  S_('wE','ctm','Kenar bandı etkin genişliği','mm',5,{min:0}),
+  S_('rwR','ctm','Yuvarlak tel geri yönlendirme r_w','–',0.45,{min:0,max:1}),
+  S_('rwT','ctm','Üçgen tel geri yönlendirme r_w','–',0.70,{min:0,max:1}),
+  S_('rwF','ctm','Yassı ribbon geri yönlendirme r_w','–',0.0,{min:0,max:1}),
+  S_('rwS','ctm','Yapılı (LHS) ribbon geri yönlendirme r_w','–',0.40,{min:0,max:1}),
+  S_('rho','ctm','Bakır özdirenci (20 °C)','µΩ·cm',1.724,{min:1}),
+  S_('kc','ctm','Kaplama/alaşım direnç çarpanı','–',1.05,{min:0.5}),
+  S_('Tm','ctm','Ölçüm sıcaklığı','°C',25),
+  S_('Rj','ctm','J-box terminal + diyot yolu direnci','mΩ',1.0,{min:0}),
+  S_('conR','ctm','Konnektör çifti direnci','mΩ',0.5,{min:0}),
+  S_('mmMode','ctm','Mismatch’i Isc CV’den hesapla','',false,{type:'bool',hint:'δ = β·CV²'}),
+  S_('dMM','ctm','Mismatch kaybı','%',0.30,{min:0}),
+  S_('beta','ctm','Mismatch katsayısı β','–',0.13,{min:0}),
+  S_('kCal','ctm','Kalibrasyon çarpanı k_kal','–',1.000,{min:0.5,max:1.5}),
+  // Monte Carlo
+  S_('n','mc','İterasyon sayısı','adet',10000,{int:1,min:100,max:200000}),
+  S_('dist','mc','Tolerans dağılımı','','normal',{type:'sel',opts:[['normal','Normal (σ = tol/3)'],['uniform','Düzgün (±tol)']]}),
+  S_('seed','mc','Rastgele tohum','',42,{int:1}),
+  S_('gT','mc','Cam kesim toleransı','± mm',1.0,{min:0}),
+  S_('fT','mc','Çerçeve montaj toleransı','± mm',1.0,{min:0}),
+  S_('sCTM','mc','Proses CTM saçılımı σ','%',0.40,{min:0}),
+  S_('sMeas','mc','Ölçüm (flasher) belirsizliği σ','%',0.50,{min:0}),
+  S_('Pplate','mc','Etiket gücü (alt sınır)','W',620,{min:0}),
+  S_('bin','mc','Güç sınıfı adımı','W',5,{min:0.5}),
+  // Maliyet (fiyat dışı)
+  S_('cur','cost','Para birimi','','$',{type:'sel',opts:[['$','USD ($)'],['€','EUR (€)'],['₺','TRY (₺)']]}),
+  S_('fluxV','cost','Flux tipi','','nc',{type:'lib',lib:'flux'}),
+  S_('fluxG','cost','Flux tüketimi','g/modül',3,{min:0}),
+  S_('packV','cost','Ambalaj tipi','','vert',{type:'lib',lib:'pack'}),
+  S_('nPal','cost','Palet başı modül','adet',36,{int:1,min:1}),
+  S_('yield','cost','Üretim verimi (yield)','%',99.0,{min:50,max:100,hint:'Hurda/düşük sınıf karşılığı maliyete eklenir'})
+];
+const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',cost:'Maliyet ayarları'};
+const SCH=Object.fromEntries(SCHEMA.map(s=>[s.k,s]));
+
+/* ---- BOM satır tanımları: fiyat birimi, varsayılan fiyat ve fire ---- */
+const BOMDEF=[
+  {id:'cell',g:'Hücre ve bağlantı',w:1.0},{id:'wire',g:'Hücre ve bağlantı',w:2.0},{id:'join',g:'Hücre ve bağlantı',w:0},
+  {id:'flux',g:'Hücre ve bağlantı',w:5,price:8},{id:'bus',g:'Hücre ve bağlantı',w:3.0},{id:'insul',g:'Hücre ve bağlantı',w:3,price:0.05},
+  {id:'glassF',g:'Cam ve katmanlar',w:0.5},{id:'rear',g:'Cam ve katmanlar',w:0.5},{id:'encF',g:'Cam ve katmanlar',w:3.0},{id:'encR',g:'Cam ve katmanlar',w:3.0},
+  {id:'label',g:'Cam ve katmanlar',w:1,price:0.06},
+  {id:'jbox',g:'Elektrik ve montaj',w:0.5},{id:'cable',g:'Elektrik ve montaj',w:1},{id:'conn',g:'Elektrik ve montaj',w:0.5},{id:'pot',g:'Elektrik ve montaj',w:5,price:6.0},{id:'jbadh',g:'Elektrik ve montaj',w:5,price:4.0},
+  {id:'frame',g:'Elektrik ve montaj',w:1.0},{id:'corner',g:'Elektrik ve montaj',w:1,price:0.03},{id:'fseal',g:'Elektrik ve montaj',w:5},{id:'edge',g:'Elektrik ve montaj',w:2},
+  {id:'pallet',g:'Ambalaj',w:0,price:14},{id:'carton',g:'Ambalaj',w:0,price:9},{id:'strap',g:'Ambalaj',w:0,price:2.5},
+  {id:'cons',g:'Üretim giderleri',w:0,price:0.25},{id:'labor',g:'Üretim giderleri',w:0,price:1.6},{id:'energy',g:'Üretim giderleri',w:0,price:0.6},
+  {id:'dep',g:'Üretim giderleri',w:0,price:1.0},{id:'qa',g:'Üretim giderleri',w:0,price:0.2},{id:'oh',g:'Üretim giderleri',w:0,price:0.8}
+];
+const BOMD=Object.fromEntries(BOMDEF.map(d=>[d.id,d]));
+
+function defaults(){
+  const p={};for(const s of SCHEMA)p[s.k]=s.v;
+  const t={};for(const s of SCHEMA)if(s.tol!==undefined)t[s.k]=s.tol;
+  for(const d of BOMDEF)p['fw_'+d.id]=d.w;
+  return {p,t};
+}
+
+/* Hazır varyant seçilince ilgili fiziksel parametreleri doldurur */
+function applyLib(p,key,id){
+  const s=SCH[key];if(!s||s.type!=='lib')return;
+  const it=LIB[s.lib].items[id];if(!it)return;
+  p[key]=id;
+  if(it.set)Object.assign(p,it.set);
+  const priceKey={techV:'cell',wireV:'wire',coatV:'wire',busV:'bus',insV:'insul',glassFV:'glassF',rearV:'rear',encFV:'encF',encRV:'encR',jboxV:'jbox',cableV:'cable',connV:'conn',potV:'pot',
+    frameV:'frame',fsealV:'fseal',edgeV:'edge',joinV:'join',fluxV:'flux',packV:['pallet','carton','strap']}[key];
+  if(priceKey)for(const pk of [].concat(priceKey))delete p['pr_'+pk];
+  if(key==='fmtV'||key==='techV')cellFrom(p);
+  if(key==='encFV')p.Tf=it.T;
+  if(key==='rearV'||key==='encRV')p.Rb=rearRb(p);
+}
+function rearRb(p){const e=LIB.enc.items[p.encRV];if(e&&e.rb!==undefined)return e.rb;const r=LIB.rear.items[p.rearV];return r?r.Rb:0.08;}
+function cellAreaCm2(p){return (p.a*p.b-4*(p.ch>0?p.ch*p.ch/2:0))/100;}
+
+/* ---- Ana hesap: geometri, CTM, elektrik, ağırlık, BOM ---- */
+function evaluate(p,light){
+  const half=!!p.half,Np=half?2:1;
+  const nc=Math.max(1,Math.round(p.nc)),nr=Math.max(1,Math.round(p.nr));
+  const a=p.a,h=half?p.b/2:p.b;
+  const up=half?Math.ceil(nr/2):nr,lo=half?nr-up:0;
+  const nGapCol=Math.max(up-1,0)+Math.max(lo-1,0);
+  const gmUse=half&&lo>0?p.gm:0;
+  const blockL=nr*h+nGapCol*p.gc+gmUse;
+  const blockW=nc*a+(nc-1)*p.gs;
+  const Lg=blockL+2*p.eL,Wg=blockW+2*p.eW;
+  const fc=p.frameV==='none'?0:p.fc;
+  const L=Lg+2*fc,W=Wg+2*fc;
+  const N=nc*nr,Nfull=half?N/2:N,Ns=N/Np;
+  const chA=p.ch>0?p.ch*p.ch/2:0;
+  const Apiece=a*h-(half?2:4)*chA;
+  const Acells=N*Apiece,Amod=L*W,Aglass=Lg*Wg;
+  // elektrik
+  const Pp=half?p.P/2:p.P,Ip=half?p.Imp/2:p.Imp,Iscp=half?p.Isc/2:p.Isc;
+  const Pcells=N*Pp;
+  const steps=[];const add=(id,l,k,kind,note)=>steps.push({id,l,k,kind,note});
+  add('cut','Kesme (half-cut) kaybı',half?1-p.dCut/100:1,'loss','δ_kes');
+  const Rf=(p.ar?p.Rf:p.RfNo)/100;
+  add('refl','Ön cam yüzey yansıması',1-Rf,'opt','1 − R_ön');
+  add('abs','Ön cam soğurması',Math.exp(-p.aG*p.tgf),'opt','exp(−α·t_cam)');
+  add('enc','Enkapsülan geçirgenliği',p.Tf/100,'opt',(LIB.enc.items[p.encFV]||{}).l||'');
+  add('im','İndeks uyumu kazancı',1+p.Gim/100,'opt','1 + G_IM');
+  const Agint=nc*(nGapCol*p.gc*a+gmUse*a)+(nc-1)*p.gs*blockL+N*(a*h-Apiece);
+  const Aedge=2*Math.min(p.wE,Math.max(p.eL,0))*blockW+2*Math.min(p.wE,Math.max(p.eW,0))*blockL;
+  const Agap=Math.max(Agint,0)+Aedge;
+  add('gap','Gap geri yansıma kazancı',1+p.Rb*p.fy*Agap/Acells,'opt','1 + R_arka·f_yak·A_gap/A_hücre');
+  const rw=p.wt==='round'?p.rwR:p.wt==='tri'?p.rwT:p.wt==='struct'?p.rwS:p.rwF;
+  const lOn=Math.max(h-2*p.ov,0);
+  const shade=(p.tech==='BC'||p.tech==='MWT')?0:p.nbb*Math.max(p.dw-p.wpad,0)*lOn*(1-rw)/Apiece;
+  add('shade','Tel gölgelemesi',1-shade,'opt',(p.tech==='BC'||p.tech==='MWT')?p.tech+' hücre: önde tel yok':'N_bb·(d−w_pad)·ℓ·(1−r_w)/A');
+  let kI=1;for(const s of steps)if(s.kind==='opt')kI*=s.k;
+  const kCut=steps[0].k;
+  const P1=Pcells*kCut*kI;
+  const rhoT=p.rho*1e-8*(1+0.00393*(p.Tm-20))*p.kc; // Ω·m
+  const Aw=p.wt==='round'?Math.PI*p.dw*p.dw/4:p.wt==='tri'?Math.sqrt(3)/4*p.dw*p.dw:p.dw*p.tr; // mm²
+  const Rw=rhoT/(Aw*1e-6);
+  const Ipe=Ip*kI,Iw=Ipe/p.nbb;
+  const Pw=N*p.nbb*Iw*Iw*Rw*(2*lOn/3+Math.max(p.gc,0))/1000;
+  const Ab=p.bw*p.bt,Rbus=rhoT/(Ab*1e-6);
+  const Leq=Np*((nc/2)*p.gs+nc*2*a/3)/1000;
+  const Imod=Np*Ipe;
+  const Pbus=Ipe*Ipe*Rbus*Leq+2*Imod*Imod*Rbus*p.lead/1000;
+  const rhoCab=1.85e-8*(1+0.00393*(p.Tm-20));
+  const Rcab=2*rhoCab*(p.cabL/1000)/(p.cabA*1e-6); // Ω
+  const Rjt=Rcab+(p.Rj+p.conR)/1000;
+  const Pj=Imod*Imod*Rjt;
+  add('rw','Tel / ara bağlantı direnç kaybı',1-Pw/P1,'res','N·N_bb·I_w²·R′·(2ℓ/3 + g)');
+  add('rb','Bus ribbon direnç kaybı',1-Pbus/P1,'res','I²·R′_bus·L_eş');
+  add('rj','J-box, kablo, konnektör kaybı',1-Pj/P1,'res','I_mod²·(R_kablo + R_term + R_kon)');
+  const dmm=p.mmMode?p.beta*p.cvI*p.cvI:p.dMM;
+  add('mm','Mismatch',1-dmm/100,'loss',p.mmMode?'β·CV²':'girilen değer');
+  add('cal','Kalibrasyon çarpanı',p.kCal,'cal','k_kal');
+  let P=Pcells;for(const s of steps){s.P0=P;P*=s.k;s.P1=P;s.dW=s.P1-s.P0;s.dPct=(s.k-1)*100;}
+  const Voc=Ns*p.Voc,Isc=Np*Iscp*kI,Imp=Imod,Vmp=P/Imp,FF=P/(Voc*Isc);
+  const eta=P/(Amod/1e6*10),etaG=P/(Aglass/1e6*10);
+  const R={half,Np,Ns,N,Nfull,nc,nr,up,lo,h,nGapCol,gmUse,blockL,blockW,Lg,Wg,L,W,fc,Apiece,Acells,Amod,Aglass,
+    AAR:Acells/Amod*100,Pcells,steps,P,CTM:P/Pcells*100,eta,etaG,Voc,Isc,Imp,Vmp,FF,kI,Agap,Pw,Pbus,Pj,Rw,Rbus,Rjt,Rcab,Iw,Ipe,Imod,lOn,Aw,Ab,dmm};
+  if(light)return R;
+  // ağırlık
+  const Ag=Aglass/1e6,perim=2*(L+W)/1000;
+  const rear=LIB.rear.items[p.rearV]||{kind:'glass'};
+  const eF=LIB.enc.items[p.encFV]||{rho:0.95},eR=LIB.enc.items[p.encRV]||{rho:0.95};
+  const wireLen=N*p.nbb*(2*lOn+Math.max(p.gc,0))/1000;
+  const busLen=Np*2*blockW/1000+2*p.lead/1000;
+  const fr=p.frameV!=='none';
+  const m={
+    gF:2.5*p.tgf*Ag, gR:rear.kind==='glass'?2.5*p.tgr*Ag:p.bsg*Ag/1000,
+    eF:eF.rho*p.tef*Ag, eR:eR.rho*p.ter*Ag, cells:Nfull*p.mc/1000,
+    wire:8.96*Aw*wireLen*1.05/1000, bus:8.96*Ab*busLen*1.05/1000,
+    frame:fr?p.fkg*perim:0, sil:fr&&p.fsealV!=='tape'?p.sil*perim/1000:0,
+    jb:p.jbm+(p.potG*p.nJB+p.jbAdhG)/1000
+  };
+  m.total=Object.values(m).reduce((s,x)=>s+x,0);
+  R.mass=m;R.wireLen=wireLen;R.busLen=busLen;R.perim=perim;R.rearKind=rear.kind;
+  // sınır kontrolleri
+  const V=[];
+  const eBus=p.eL-p.bg-p.bw;R.eBus=eBus;
+  if(p.eW<p.eMin)V.push({id:'eW',m:`Yan kenar mesafesi ${f(p.eW,2)} mm < min. ${f(p.eMin,1)} mm`});
+  if(eBus<p.eMin)V.push({id:'eL',m:`Üst/alt kenarda bus ribbon–cam kenarı mesafesi ${f(eBus,2)} mm < min. ${f(p.eMin,1)} mm`});
+  if(p.gc<p.gcMin)V.push({id:'gc',m:`Hücre arası boşluk ${f(p.gc,2)} mm < min. ${f(p.gcMin,2)} mm`});
+  if(nc>1&&p.gs<p.gsMin)V.push({id:'gs',m:`String aralığı ${f(p.gs,2)} mm < min. ${f(p.gsMin,2)} mm`});
+  if(half&&p.gm<p.gmMin)V.push({id:'gm',m:`Orta boşluk ${f(p.gm,2)} mm < min. ${f(p.gmMin,2)} mm`});
+  if(L>p.Lmax)V.push({id:'L',m:`Modül boyu ${f(L,1)} mm > maks. ${f(p.Lmax,1)} mm`});
+  if(W>p.Wmax)V.push({id:'W',m:`Modül genişliği ${f(W,1)} mm > maks. ${f(p.Wmax,1)} mm`});
+  if(half&&nr%2)V.push({id:'nr',m:'Half-cut dizilimde sütun başına parça sayısı çift olmalı'});
+  if(lOn<=0)V.push({id:'ov',m:'Tel uç boşluğu hücre boyunun yarısından büyük'});
+  if(p.frameV==='none'&&rear.kind==='bs')V.push({id:'fr',m:'Backsheet’li modül çerçevesiz olamaz'});
+  if((LIB.enc.items[p.encFV]||{}).white)V.push({id:'enc',m:'Beyaz enkapsülan ön yüzde kullanılamaz'});
+  R.viol=V;R.bad=new Set(V.map(v=>v.id));
+  R.bom=bom(p,R);
+  return R;
+}
+
+function bom(p,R){
+  const out=[],Ag=R.Aglass/1e6,perim=R.perim;
+  const L=(id,l,spec,q,u,pu,defPrice,mult=1)=>{
+    const price=p['pr_'+id]!==undefined?p['pr_'+id]:defPrice;
+    const w=p['fw_'+id]!==undefined?p['fw_'+id]:BOMD[id].w;
+    out.push({id,g:BOMD[id].g,l,spec,q,u,pu,price,w,mult,cost:q*mult*price*(1+w/100)});
+  };
+  const it=(lib,id)=>LIB[lib].items[id]||{l:'?',price:0,spec:''};
+  const c=it('tech',p.techV),fm=it('fmt',p.fmtV),wi=it('wire',p.wireV),co=it('coat',p.coatV),jo=it('join',p.joinV),bu=it('bus',p.busV),gF=it('glassF',p.glassFV),
+        rr=it('rear',p.rearV),eF=it('enc',p.encFV),eR=it('enc',p.encRV),jb=it('jbox',p.jboxV),cb=it('cable',p.cableV),cn=it('conn',p.connV),
+        fr=it('frame',p.frameV),fs=it('fseal',p.fsealV),ed=it('edge',p.edgeV),po=it('pot',p.potV),ins=it('insul',p.insV),fl=it('flux',p.fluxV),pk=it('pack',p.packV);
+  const cur=p.cur;
+  L('cell','Hücre',`${c.l} · ${fm.l} · ${f(p.P,2)} W`,R.Nfull,'adet',cur+'/W',c.price,p.P);
+  L('wire','Bağlantı teli / ribbon',`${wi.l} · ${co.l}`,R.mass.wire,'kg',cur+'/kg',+((wi.price||0)+(co.add||0)).toFixed(2));
+  if(jo.cost>0)L('join',jo.l,jo.spec,1,'modül',cur+'/modül',jo.cost);
+  if(jo.flux)L('flux','Lehim flux’ı',fl.l,p.fluxG/1000,'kg',cur+'/kg',fl.price);
+  L('bus','Bus ribbon',bu.l,R.mass.bus,'kg',cur+'/kg',bu.price);
+  L('insul','Bus yalıtım şeridi',ins.l,R.busLen,'m',cur+'/m',ins.price);
+  L('glassF','Ön cam',gF.l,Ag,'m²',cur+'/m²',gF.price);
+  L('rear',R.rearKind==='glass'?'Arka cam':'Backsheet',rr.l,Ag,'m²',cur+'/m²',rr.price);
+  L('encF','Ön enkapsülan',`${eF.l} · ${f(p.tef,2)} mm`,R.mass.eF,'kg',cur+'/kg',eF.price);
+  L('encR','Arka enkapsülan',`${eR.l} · ${f(p.ter,2)} mm`,R.mass.eR,'kg',cur+'/kg',eR.price);
+  L('label','Etiket + laminat içi barkod','',1,'set',cur+'/set',BOMD.label.price);
+  L('jbox','J-box gövdesi (diyotlu)',jb.l,1,'set',cur+'/set',jb.price);
+  L('cable','Solar kablo',cb.l,2*p.cabL/1000,'m',cur+'/m',cb.price);
+  L('conn','Konnektör çifti',cn.l,1,'çift',cur+'/çift',cn.price);
+  if(p.potV!=='none')L('pot','J-box potting',`${po.l} · ${p.nJB} kutu × ${f(p.potG,0)} g`,p.potG*p.nJB/1000,'kg',cur+'/kg',po.price);
+  L('jbadh','J-box yapıştırma silikonu','',p.jbAdhG/1000,'kg',cur+'/kg',BOMD.jbadh.price);
+  if(p.frameV!=='none'){
+    L('frame','Çerçeve',fr.l,R.mass.frame,'kg',cur+'/kg',fr.price);
+    L('corner','Köşe takozu','',4,'adet',cur+'/adet',BOMD.corner.price);
+    if(fs.unit==='kg')L('fseal','Çerçeve yapıştırıcısı',fs.l,R.mass.sil,'kg',cur+'/kg',fs.price);
+    else L('fseal','Çerçeve bandı',fs.l,perim,'m',cur+'/m',fs.price);
+  }else if(p.edgeV!=='none'){
+    L('edge',ed.l,ed.spec,ed.unit==='m'?perim:4,ed.unit,cur+'/'+ed.unit,ed.price);
+  }
+  const np=1/p.nPal;
+  L('pallet','Palet / kasa / raf',pk.l,np,'palet',cur+'/palet',pk.pal);
+  L('carton','Karton, köşe koruyucu, ara karton',pk.l,np,'palet',cur+'/palet',pk.car);
+  L('strap','Çember, streç film, palet etiketi','',np,'palet',cur+'/palet',pk.str);
+  L('cons','Proses sarfları','teflon, membran, IPA, EL sarfı',1,'modül',cur+'/modül',BOMD.cons.price);
+  L('labor','Direkt işçilik','',1,'modül',cur+'/modül',BOMD.labor.price);
+  L('energy','Enerji','',1,'modül',cur+'/modül',BOMD.energy.price);
+  L('dep','Amortisman','',1,'modül',cur+'/modül',BOMD.dep.price);
+  L('qa','Kalite / test (EL, flasher, Hi-pot)','',1,'modül',cur+'/modül',BOMD.qa.price);
+  L('oh','Genel gider','',1,'modül',cur+'/modül',BOMD.oh.price);
+  const sub=out.reduce((s,x)=>s+x.cost,0);
+  const yl=sub*(100/p.yield-1);
+  const total=sub+yl;
+  return {lines:out,sub,yieldLoss:yl,total,perW:total/R.P,mat:out.filter(x=>!['Üretim giderleri'].includes(x.g)).reduce((s,x)=>s+x.cost,0)};
+}
+
+/* ---- Monte Carlo ---- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
+const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+function runMC(p,tol){
+  const n=Math.round(p.n),rng=mulberry32(Math.round(p.seed)||1);
+  let spare=null;const gauss=()=>{if(spare!==null){const s=spare;spare=null;return s;}let u=0,v=0;while(u===0)u=rng();v=rng();const r=Math.sqrt(-2*Math.log(u));spare=r*Math.sin(2*Math.PI*v);return r*Math.cos(2*Math.PI*v);};
+  const uni=p.dist==='uniform';
+  const T=k=>tol[k]||0;
+  const draw=(mu,t)=>t>0?(uni?mu+(rng()*2-1)*t:mu+gauss()*t/3):mu;
+  const sd=t=>uni?t/Math.sqrt(3):t/3;
+  const drawSum=(mu,t,k)=>k<=0?0:(t>0?(k===1?draw(mu,t):mu*k+gauss()*sd(t)*Math.sqrt(k)):mu*k);
+  const R0=evaluate(p,true);
+  const nc=R0.nc,nr=R0.nr,ng=R0.nGapCol;
+  const P=new Float64Array(n),E=new Float64Array(n),Ls=new Float64Array(n),Ws=new Float64Array(n),eS=new Float64Array(n),eB=new Float64Array(n);
+  let vE=0,vB=0,vL=0,vW=0,vP=0,vAny=0;
+  const q=Object.assign({},p);
+  for(let i=0;i<n;i++){
+    q.a=draw(p.a,T('a'));q.b=draw(p.b,T('b'));
+    const h=R0.half?q.b/2:q.b;
+    const sGc=drawSum(p.gc,T('gc'),ng),sGs=drawSum(p.gs,T('gs'),nc-1),gm=R0.gmUse?draw(p.gm,T('gm')):0;
+    const blockL=nr*h+sGc+gm,blockW=nc*q.a+sGs;
+    const Lg=draw(R0.Lg,p.gT),Wg=draw(R0.Wg,p.gT);
+    const oy=draw(0,T('pl')),ox=draw(0,T('pl'));
+    const eL=(Lg-blockL)/2,eW=(Wg-blockW)/2;
+    q.gc=ng?sGc/ng:p.gc;q.gs=nc>1?sGs/(nc-1):p.gs;q.gm=R0.gmUse?gm:p.gm;q.eL=eL;q.eW=eW;
+    q.tgf=draw(p.tgf,T('tgf'));q.tgr=draw(p.tgr,T('tgr'));q.dw=draw(p.dw,T('dw'));
+    const r=evaluate(q,true);
+    const Lm=r.L+draw(0,p.fT),Wm=r.W+draw(0,p.fT);
+    const Pi=r.P*(1+gauss()*p.sP/100)*(1+gauss()*p.sCTM/100)*(1+gauss()*p.sMeas/100);
+    const es=Math.min(eW+ox,eW-ox),eb=Math.min(eL+oy,eL-oy)-p.bg-p.bw;
+    P[i]=Pi;E[i]=Pi/(Lm*Wm/1e6*10);Ls[i]=Lm;Ws[i]=Wm;eS[i]=es;eB[i]=eb;
+    const a1=es<p.eMin,a2=eb<p.eMin,a3=Lm>p.Lmax,a4=Wm>p.Wmax,a5=Pi<p.Pplate;
+    vE+=a1;vB+=a2;vL+=a3;vW+=a4;vP+=a5;vAny+=(a1||a2||a3||a4);
+  }
+  const pg=(mu,t,mn,count)=>{if(count<=0)return 0;if(!(t>0))return mu<mn?1:0;const ps=uni?Math.min(Math.max((mn-(mu-t))/(2*t),0),1):Phi((mn-mu)/(t/3));return 1-Math.pow(1-ps,count);};
+  return {n,P,E,Ls,Ws,eS,eB,
+    prob:{eSide:vE/n,eBus:vB/n,L:vL/n,W:vW/n,Pplate:vP/n,dimAny:vAny/n,
+      gc:pg(p.gc,T('gc'),p.gcMin,ng*nc),gs:pg(p.gs,T('gs'),p.gsMin,nc-1),gm:R0.gmUse?pg(p.gm,T('gm'),p.gmMin,1):0},
+    nom:R0};
+}
+function stats(arr){const s=Float64Array.from(arr).sort();const n=s.length;let m=0;for(const x of s)m+=x;m/=n;let v=0;for(const x of s)v+=(x-m)*(x-m);const sd=Math.sqrt(v/(n-1));const q=pp=>s[Math.min(n-1,Math.max(0,Math.round(pp*(n-1))))];return {mean:m,sd,min:s[0],max:s[n-1],p5:q(.05),p50:q(.5),p95:q(.95),sorted:s};}
+
+/* ---- Biçimlendirme ---- */
+function f(x,d=1){return Number.isFinite(x)?x.toLocaleString('tr-TR',{minimumFractionDigits:d,maximumFractionDigits:d}):'–';}
+function fs(x,d=1){if(!Number.isFinite(x))return '–';const r=Number(x.toFixed(d));return (r>0?'+':r<0?'−':'±')+f(Math.abs(r),d);}
+</script>
+
+<!-- ================= ARAYÜZ ================= -->
+<script>
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LS={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+
+/* ---- Şablonlar: sektördeki tipik modül yapıları ---- */
+const ERAS={now:'Güncel (2023 →)',mid:'Geçiş dönemi (2019–2022)',old:'Eski tip (≤ 2018)'};
+const TEMPLATES=[
+  {id:'gg_tc_g12r',era:'now',l:'Cam-cam çerçeveli · TOPCon G12R · 132 yarım hücre, 16BB (2382×1134)',lib:{},set:{}},
+  {id:'gg_tc_m10r',era:'now',l:'Cam-cam çerçeveli · TOPCon M10R 0BB · 144 yarım hücre (2278×1134)',
+    lib:{fmtV:'m10r',techV:'topcon0bb',wireV:'r20',coatV:'bare',joinV:'film',rearV:'gr20',encFV:'EPE',encRV:'POE',frameV:'al30'},set:{nbb:20,nc:6,nr:24,gc:1.0,gm:6,eL:19.5,eW:11.15,Pplate:590,Lmax:2280,Wmax:1136}},
+  {id:'gg_tc_g12',era:'now',auto:true,l:'Cam-cam çerçeveli · TOPCon G12 · 132 yarım hücre, 18BB',
+    lib:{fmtV:'g12',techV:'topcon',wireV:'r22',rearV:'gr20',encFV:'EPE',encRV:'POE',frameV:'al35',jboxV:'split35',cableV:'c40_400'},set:{nbb:18,nc:6,nr:22,gc:1.0,gm:6,eL:24,eW:15.25}},
+  {id:'gg_hjt_g12',era:'now',l:'Cam-cam çerçevesiz · HJT G12 · 132 yarım hücre (2384×1303)',
+    lib:{fmtV:'g12',techV:'hjt',wireV:'r22',coatV:'snbi',joinV:'lt',glassFV:'g20ar',rearV:'gc20',encFV:'POE',encRV:'POE',frameV:'none',edgeV:'tape',jboxV:'split35',cableV:'c40_400'},set:{nbb:18,nc:6,nr:22,gc:1.0,gm:6,eL:24,eW:15.25,Pplate:705,Lmax:2386,Wmax:1305}},
+  {id:'gg_hjt_g12r',era:'now',auto:true,l:'Cam-cam çerçeveli · HJT G12R Cu kaplama · 132 yarım hücre, 0BB',
+    lib:{fmtV:'g12r',techV:'hjt_cu',wireV:'r18',coatV:'snbi',joinV:'film',glassFV:'g20ar',rearV:'gc20',encFV:'POE',encRV:'POE',frameV:'al30'},set:{nbb:20,nc:6,nr:22,gc:1.0,gm:6,eL:20,eW:11.15}},
+  {id:'gg_bc_m10r',era:'now',l:'Cam-cam çerçeveli · BC M10R · 144 yarım hücre (2278×1134)',
+    lib:{fmtV:'m10r',techV:'bc',wireV:'f9x20',rearV:'gc20',encFV:'POE',encRV:'POE',frameV:'al30'},set:{nbb:10,nc:6,nr:24,gc:1.0,gm:6,eL:19.5,eW:11.15,Pplate:620,Lmax:2280,Wmax:1136}},
+  {id:'gb_bc_blk',era:'now',auto:true,l:'Cam-backsheet all-black · BC M10R · 108 yarım hücre (çatı)',
+    lib:{fmtV:'m10r',techV:'bc',wireV:'f9x20',glassFV:'g32ar',rearV:'bsBLK',encFV:'POE',encRV:'EVAB',frameV:'al30b',jboxV:'split25'},set:{nbb:10,nc:6,nr:18,gc:1.0,gm:6,eL:19.5,eW:11.15}},
+  {id:'rd_tandem',era:'now',auto:true,l:'Ar-Ge · Perovskit/Si tandem M10R · 144 yarım hücre, cam-cam',
+    lib:{fmtV:'m10r',techV:'tandem',wireV:'r24',coatV:'snbi',joinV:'lt',rearV:'gc20',encFV:'POE',encRV:'POE',frameV:'al30',edgeV:'butyl'},set:{nbb:16,nc:6,nr:24,gc:1.0,gm:6,eL:19.5,eW:11.15}},
+  {id:'gb_perc_m10',era:'mid',auto:true,l:'Cam-backsheet · PERC M10 182 · 144 yarım hücre, 10BB, 3,2 mm cam',
+    lib:{fmtV:'m10',techV:'perc',wireV:'r30',glassFV:'g32ar',rearV:'bsKPf',encFV:'EVA',encRV:'EVAW',frameV:'al35'},set:{eta:23.4,nbb:10,wpad:0.1,nc:6,nr:24,gc:1.5,gm:6,eL:19.6,eW:11.4}},
+  {id:'gb_perc_m6',era:'mid',auto:true,l:'Cam-backsheet · PERC M6 · 144 yarım hücre, 9BB MBB',
+    lib:{fmtV:'m6',techV:'perc',wireV:'r35',busV:'b5x35',glassFV:'g32ar',rearV:'bsKPf',encFV:'EVA',encRV:'EVAW',frameV:'al35',cableV:'c40_1200'},set:{eta:22.8,half:true,nbb:9,wpad:0.1,nc:6,nr:24,gc:1.5,gm:6,eL:20,eW:13,ov:2}},
+  {id:'gg_perc_m6',era:'mid',auto:true,l:'Cam-cam bifasiyal · PERC M6 · 144 yarım hücre, 9BB, 2,0+2,0 mm',
+    lib:{fmtV:'m6',techV:'perc_bi',wireV:'r35',glassFV:'g20ar',rearV:'gc20',encFV:'EVA',encRV:'POE',frameV:'al30',cableV:'c40_1200'},set:{eta:22.6,half:true,nbb:9,wpad:0.1,nc:6,nr:24,gc:1.5,gm:6,eL:20,eW:13,ov:2}},
+  {id:'gb_perc_g1',era:'mid',auto:true,l:'Cam-backsheet · PERC G1 · 120 yarım hücre, 5BB',
+    lib:{fmtV:'g1',techV:'perc',wireV:'f9x23',busV:'b5x35',glassFV:'g32ar',rearV:'bsKPf',encFV:'EVA',encRV:'EVA',frameV:'al35',cableV:'c40_1200'},set:{eta:22.2,half:true,nbb:5,wpad:0.7,nc:6,nr:20,gc:1.5,gm:6,eL:20,eW:15,ov:2}},
+  {id:'gb_pert_m4',era:'mid',auto:true,l:'Cam-cam bifasiyal · n-PERT M4 · 72 tam hücre, 5BB',
+    lib:{fmtV:'m4',techV:'pert',wireV:'f9x23',busV:'b6x40',glassFV:'g25ar',rearV:'gc25',encFV:'POE',encRV:'POE',frameV:'al35',jboxV:'one3',cableV:'c40_1000'},set:{half:false,nbb:5,wpad:0.7,nc:6,nr:12,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'gb_mwt_m2',era:'mid',auto:true,l:'Cam-iletken backsheet · MWT PERC M2 · 60 tam hücre',
+    lib:{fmtV:'m2',techV:'mwt',wireV:'f9x20',coatV:'bare',joinV:'eca',busV:'b6x40',glassFV:'g32ar',rearV:'bsMWT',encFV:'EVA',encRV:'EVA',frameV:'al35',jboxV:'one3',cableV:'c40_900'},set:{half:false,nbb:4,nc:6,nr:10,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'old72_mono',era:'old',auto:true,l:'Cam-backsheet · Al-BSF mono M2 · 72 tam hücre, 4BB',
+    lib:{fmtV:'m2',techV:'bsf_mono',wireV:'f10x25',busV:'b6x40',glassFV:'g32ar',rearV:'bsTPT',encFV:'EVAold',encRV:'EVAold',frameV:'al40',jboxV:'one3',cableV:'c40_1000',insV:'tpt',fluxV:'rma',packV:'horiz'},set:{eta:19.6,half:false,nbb:4,wpad:0.9,nc:6,nr:12,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'old60_perc',era:'old',auto:true,l:'Cam-backsheet · PERC mono M2 · 60 tam hücre, 5BB',
+    lib:{fmtV:'m2',techV:'perc',wireV:'f9x23',busV:'b6x40',glassFV:'g32ar',rearV:'bsKPK',encFV:'EVA',encRV:'EVA',frameV:'al35',jboxV:'one3',cableV:'c40_900'},set:{eta:21.6,half:false,nbb:5,wpad:0.7,nc:6,nr:10,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'old60_pmc',era:'old',auto:true,l:'Cam-backsheet · PERC multi (black-Si) M2 · 60 tam hücre, 5BB',
+    lib:{fmtV:'m2sq',techV:'perc_mc',wireV:'f9x23',busV:'b6x40',glassFV:'g32ar',rearV:'bsKPE',encFV:'EVA',encRV:'EVA',frameV:'al35',jboxV:'one3',cableV:'c40_900'},set:{half:false,nbb:5,wpad:0.7,nc:6,nr:10,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'old60_multi',era:'old',auto:true,l:'Cam-backsheet · Al-BSF multi M2 · 60 tam hücre, 4BB',
+    lib:{fmtV:'m2sq',techV:'bsf_mc',wireV:'f10x25',busV:'b6x40',glassFV:'g32ar',rearV:'bsTPE',encFV:'EVA',encRV:'EVA',frameV:'al40',jboxV:'one3',cableV:'c40_900'},set:{half:false,nbb:4,wpad:0.9,nc:6,nr:10,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'old60_3bb',era:'old',auto:true,l:'Cam-backsheet · Al-BSF multi M2 · 60 tam hücre, 3BB LHS ribbon',
+    lib:{fmtV:'m2sq',techV:'bsf_mc',wireV:'s15x20',busV:'b6x40',glassFV:'g32ar',rearV:'bsTPT',encFV:'EVAold',encRV:'EVAold',frameV:'al40',jboxV:'one3',cableV:'c40_900',insV:'tpt',fluxV:'rma',packV:'horiz'},set:{half:false,nbb:3,wpad:1.4,nc:6,nr:10,gc:2,gs:3,eL:24,eW:15,ov:2}},
+  {id:'old72_m0',era:'old',auto:true,l:'Cam-backsheet · Al-BSF mono M0 156 · 72 tam hücre, 3BB',
+    lib:{fmtV:'f156m0',techV:'bsf_mono',wireV:'f15x20',busV:'b6x40',glassFV:'g32no',rearV:'bsTPT',encFV:'EVAold',encRV:'EVAold',frameV:'al45',jboxV:'one3',cableV:'c40_900',potV:'none',insV:'tpt',fluxV:'rma',packV:'horiz'},set:{eta:18.8,half:false,nbb:3,wpad:1.4,nc:6,nr:12,gc:2.5,gs:3,eL:25,eW:16,ov:2}},
+  {id:'old60_m0mc',era:'old',auto:true,l:'Cam-backsheet · Al-BSF multi M0 156 · 60 tam hücre, 2BB (çok eski)',
+    lib:{fmtV:'f156sq',techV:'bsf_mc',wireV:'f20x18',busV:'b6x40',glassFV:'g32no',rearV:'bsTPT',encFV:'EVAold',encRV:'EVAold',frameV:'al45',jboxV:'one2',cableV:'c25_900',potV:'none',insV:'tpt',fluxV:'rma',packV:'horiz'},set:{eta:16.8,half:false,nbb:2,wpad:1.8,nc:6,nr:10,gc:2.5,gs:3,eL:25,eW:16,ov:2}},
+  {id:'old72_125',era:'old',auto:true,l:'Cam-backsheet · Mono 125 mm (5 inç) · 72 tam hücre, 2BB (çok eski)',
+    lib:{fmtV:'f125',techV:'bsf_mono',wireV:'f20x15',busV:'b5x30',glassFV:'g32no',rearV:'bsTPT',encFV:'EVAold',encRV:'EVAold',frameV:'al45',jboxV:'one2',cableV:'c25_900',potV:'none',insV:'tpt',fluxV:'rma',packV:'horiz'},set:{eta:17.5,half:false,nbb:2,wpad:1.8,nc:6,nr:12,gc:2.5,gs:3,eL:25,eW:16,ov:2}},
+  {id:'old36_12v',era:'old',auto:true,l:'Cam-backsheet · Al-BSF multi M2 · 36 hücre (12 V), 3BB',
+    lib:{fmtV:'m2sq',techV:'bsf_mc',wireV:'f15x20',busV:'b6x40',glassFV:'g32no',rearV:'bsTPT',encFV:'EVAold',encRV:'EVAold',frameV:'al35',jboxV:'one2',cableV:'c25_900',insV:'tpt',fluxV:'rma',packV:'horiz'},set:{half:false,nbb:3,wpad:1.4,nc:4,nr:9,gc:2,gs:3,eL:24,eW:14,ov:2}}
+];
+function fromTemplate(id){
+  const d=defaults();const tp=TEMPLATES.find(t=>t.id===id)||TEMPLATES[0];
+  cellFrom(d.p);
+  for(const [k,v] of Object.entries(tp.lib))applyLib(d.p,k,v);
+  for(const [k,v] of Object.entries(tp.set))if(k in SCH&&k!=='eta')d.p[k]=v;
+  if(tp.set.eta)cellFrom(d.p,tp.set.eta);
+  d.p.Rb=rearRb(d.p);d.p.Tf=(LIB.enc.items[d.p.encFV]||{T:99}).T;
+  if(tp.auto){const r=evaluate(d.p,true);d.p.Pplate=Math.floor(r.P/5)*5;d.p.Lmax=Math.ceil(r.L)+2;d.p.Wmax=Math.ceil(r.W)+2;}
+  return {name:tp.l,p:d.p,t:d.t,tpl:tp.id};
+}
+
+/* ---- Durum ---- */
+let S=(()=>{const dr=LS.get('pvmt2.draft');if(dr&&dr.p){const b=defaults();return {name:dr.name||'Tasarım',p:Object.assign(b.p,dr.p),t:Object.assign(b.t,dr.t||{}),tpl:dr.tpl||''};}return fromTemplate(TEMPLATES[0].id);})();
+let R=null,MC=null,MCstale=false,DL=null;
+let SAVED=LS.get('pvmt2.saved');
+if(!Array.isArray(SAVED)){
+  const a=fromTemplate('gg_tc_g12r'),b=fromTemplate('gg_tc_g12r');
+  applyLib(b.p,'rearV','gc20');applyLib(b.p,'encFV','POE');applyLib(b.p,'wireV','r26');
+  const c=fromTemplate('gg_tc_m10r');
+  SAVED=[{id:'ex1',name:'G12R 132 · grid arka cam (örnek)',p:a.p,t:a.t,ex:true},{id:'ex2',name:'G12R 132 · şeffaf arka cam, POE, Ø0,26 tel (örnek)',p:b.p,t:b.t,ex:true},{id:'ex3',name:'M10R 144 · 0BB 20 tel (örnek)',p:c.p,t:c.t,ex:true}];
+}
+let CMP=LS.get('pvmt2.cmp')||{ref:'ex1',sel:['ex1','ex2','ex3']};
+
+/* ---- Girdi alanları ---- */
+const fmtIn=v=>typeof v==='number'?v.toLocaleString('tr-TR',{maximumFractionDigits:6,useGrouping:false}):v;
+const parseNum=s=>{s=String(s).trim().replace(/\s/g,'').replace(',','.');return s===''?NaN:Number(s);};
+function libOpts(s){const items=LIB[s.lib].items;return Object.entries(items).filter(([,it])=>!s.filter||s.filter(it)).map(([id,it])=>[id,it.l+(it.spec?' — '+it.spec:'')]);}
+function rowHTML(s){
+  const id='in-'+s.k,hint=s.hint?`<small>${esc(s.hint)}</small>`:'';
+  if(s.type==='lib'||s.type==='sel'){
+    const opts=(s.type==='lib'?libOpts(s):s.opts).map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');
+    return `<div class="row wide" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><select id="${id}" data-k="${s.k}">${opts}</select></div>`;
+  }
+  if(s.type==='bool')return `<div class="row" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><div class="val"><input type="checkbox" id="${id}" data-k="${s.k}"></div><div></div></div>`;
+  const tol=s.tol!==undefined?`<div class="tol"><span>±</span><input type="text" inputmode="decimal" id="tol-${s.k}" data-tol="${s.k}" aria-label="${esc(s.l)} toleransı"></div>`:'<div></div>';
+  return `<div class="row" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><div class="val"><input type="text" inputmode="decimal" id="${id}" data-k="${s.k}"><span class="u">${esc(s.u)}</span></div>${tol}</div>`;
+}
+function groupHTML(g,open){
+  const items=SCHEMA.filter(s=>s.g===g&&s.k!=='cur');
+  const hasTol=items.some(s=>s.tol!==undefined);
+  return `<details class="grp" ${open?'open':''} data-grp="${g}"><summary><h3>${GROUPS[g]}</h3><small id="gs-${g}"></small></summary><div class="rows">${hasTol?'<div class="rowhead"><span></span><span>Değer</span><span>± Tol.</span></div>':''}${items.map(rowHTML).join('')}</div></details>`;
+}
+function buildInputs(){
+  $('#inputsDesign').innerHTML=['cell','lay','int','mat','fr','lim'].map((g,i)=>groupHTML(g,i<2)).join('');
+  $('#inputsCTM').innerHTML=groupHTML('ctm',false);
+  $('#inputsMC').innerHTML=groupHTML('mc',true);
+  $('#inputsCost').innerHTML=groupHTML('cost',false);
+  $('#in-cur').innerHTML=SCH.cur.opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  $('#tplSel').innerHTML='<option value="">— Şablon seçin —</option>'+Object.entries(ERAS).map(([e,el])=>`<optgroup label="${esc(el)}">${TEMPLATES.filter(t=>t.era===e).map(t=>`<option value="${t.id}">${esc(t.l)}</option>`).join('')}</optgroup>`).join('');
+}
+function syncInputs(){
+  for(const el of $$('[data-k]')){const k=el.dataset.k,v=S.p[k];
+    if(el.type==='checkbox')el.checked=!!v;else if(el.tagName==='SELECT')el.value=v;else if(document.activeElement!==el){el.value=fmtIn(v);el.classList.remove('err');}}
+  for(const el of $$('[data-tol]')){if(document.activeElement!==el){el.value=fmtIn(S.t[el.dataset.tol]??0);el.classList.remove('err');}}
+  $('#in-name').value=S.name;
+}
+function onField(el){
+  if(el.id==='tplSel'){if(el.value){const d=fromTemplate(el.value);S.p=d.p;S.t=d.t;S.name=d.name;S.tpl=d.tpl;syncInputs();schedule();}return;}
+  if(el.id==='in-name'){S.name=el.value||'Tasarım';schedule();return;}
+  if(el.dataset.tol){const v=parseNum(el.value);if(!(v>=0)){el.classList.add('err');return;}el.classList.remove('err');S.t[el.dataset.tol]=v;schedule(true);return;}
+  const k=el.dataset.k;if(!k)return;
+  const s=SCH[k];
+  if(el.dataset.pk){const v=parseNum(el.value);if(!(v>=0)){el.classList.add('err');return;}el.classList.remove('err');S.p[k]=v;schedule(true);return;}
+  if(!s)return;
+  if(s.type==='bool'){S.p[k]=el.checked;}
+  else if(s.type==='lib'){applyLib(S.p,k,el.value);syncInputs();}
+  else if(s.type==='sel'){S.p[k]=el.value;}
+  else{
+    let v=parseNum(el.value);
+    if(!Number.isFinite(v)||(s.min!==undefined&&v<s.min)||(s.max!==undefined&&v>s.max)){el.classList.add('err');return;}
+    if(s.int)v=Math.round(v);
+    el.classList.remove('err');S.p[k]=v;
+    const A=cellAreaCm2(S.p);
+    if(k==='eta'){S.p.P=+(v/100*A*0.1).toFixed(3);setVal('P');}
+    else if(k==='P'||k==='a'||k==='b'||k==='ch'){S.p.eta=+(S.p.P/(A*0.1)*100).toFixed(3);setVal('eta');}
+  }
+  schedule(true);
+}
+function setVal(k){const el=$('#in-'+k);if(el)el.value=fmtIn(S.p[k]);}
+document.addEventListener('input',e=>{const el=e.target;if(el.matches('input[type=text][data-k],input[data-tol],#in-name'))onField(el);});
+document.addEventListener('change',e=>{const el=e.target;if(el.matches('select,input[type=checkbox]'))onField(el);});
+
+let tmr=null;
+function schedule(dirty){if(dirty&&MC)MCstale=true;clearTimeout(tmr);tmr=setTimeout(recompute,120);}
+
+/* ---- Hesap + çizim ---- */
+function recompute(){
+  R=evaluate(S.p);
+  LS.set('pvmt2.draft',{name:S.name,p:S.p,t:S.t,tpl:S.tpl});
+  renderKPI();renderSummary();renderViol();renderDrawings();renderCTM();renderCost();renderCompare();
+  if(MC)renderMC();
+  for(const r of $$('.row[data-row]'))r.classList.toggle('bad',R.bad.has(r.dataset.row));
+  $('#gs-cell').textContent=`${S.p.tech} · ${f(S.p.a,1)}×${f(S.p.b,1)} · ${f(S.p.P,2)} W`;
+  $('#gs-lay').textContent=`${R.N} parça · ${R.nc}×${R.nr}${R.half?' half-cut':''}`;
+}
+function renderKPI(){
+  const c=S.p.cur,nv=R.viol.length;
+  $('#hdrName').textContent=S.name;
+  $('#kpis').innerHTML=[
+    ['Pmax',f(R.P,1)+' W'],['Verim',f(R.eta,2)+' %'],['CTM',f(R.CTM,2)+' %'],[c+'/W',f(R.bom.perW,4)],
+    ['Boyut',`${f(R.L,0)}×${f(R.W,0)}`]].map(([i,b])=>`<div class="kpi"><i>${i}</i><b>${b}</b></div>`).join('')+
+    `<div class="kpi"><i>Sınırlar</i>${nv?`<span class="chip bad">● ${nv} ihlal</span>`:'<span class="chip good">● uygun</span>'}</div>`;
+}
+function renderSummary(){
+  const m=R.mass;
+  $('#sumStats').innerHTML=[
+    ['Modül Pmax',f(R.P,1)+' W',1],['Modül verimi',f(R.eta,2)+' %',1],['CTM oranı',f(R.CTM,2)+' %'],
+    ['Modül (dış)',`${f(R.L,1)} × ${f(R.W,1)} mm`],['Cam',`${f(R.Lg,1)} × ${f(R.Wg,1)} mm`],['Modül alanı',f(R.Amod/1e6,3)+' m²'],
+    ['Hücre alanı',f(R.Acells/1e6,3)+' m²'],['Aktif alan oranı',f(R.AAR,2)+' %'],['Ağırlık',f(m.total,1)+' kg'],
+    ['Ağırlık / alan',f(m.total/(R.Amod/1e6),1)+' kg/m²'],['Maliyet',S.p.cur+f(R.bom.total,2)],[S.p.cur+'/W',f(R.bom.perW,4)]
+  ].map(([i,b,h])=>`<div class="stat${h?' hl':''}"><i>${i}</i><b>${b}</b></div>`).join('');
+}
+function renderViol(){
+  const html=R.viol.length?R.viol.map(v=>`<div>${esc(v.m)}</div>`).join(''):'<p class="okmsg">Tüm sınır kontrolleri uygun.</p>';
+  $('#violBox').innerHTML=html;
+  $('#violBox2').innerHTML=html+`<p class="note">Kontrol edilen: yan kenar ≥ ${f(S.p.eMin,1)} mm (hücre), üst/alt kenar ≥ ${f(S.p.eMin,1)} mm (bus ribbon), boşluk alt sınırları, maks. dış ölçüler. Bus ribbon–cam kenarı nominal: ${f(R.eBus,2)} mm.</p>`;
+}
+
+/* ---- SVG çizim ---- */
+function arrow(x,y,dx,dy,len){const px=-dy,py=dx,w=len*0.32;return `<polygon points="${x},${y} ${x-dx*len+px*w},${y-dy*len+py*w} ${x-dx*len-px*w},${y-dy*len-py*w}"/>`;}
+function dimH(x1,x2,yF,yL,label,ts,sw,bad){
+  const s=yL<yF?-1:1,ext=ts*0.35,len=ts*0.45,inside=(x2-x1)>2.6*len;
+  let g=`<g class="dim${bad?' bad':''}" stroke-width="${sw}"><line x1="${x1}" y1="${yF}" x2="${x1}" y2="${yL+s*ext}"/><line x1="${x2}" y1="${yF}" x2="${x2}" y2="${yL+s*ext}"/>`;
+  if(inside)g+=`<line x1="${x1}" y1="${yL}" x2="${x2}" y2="${yL}"/>`+arrow(x1,yL,-1,0,len)+arrow(x2,yL,1,0,len);
+  else g+=`<line x1="${x1-2.2*len}" y1="${yL}" x2="${x2+2.2*len}" y2="${yL}"/>`+arrow(x1,yL,1,0,len)+arrow(x2,yL,-1,0,len);
+  return g+`<text x="${(x1+x2)/2}" y="${yL-ts*0.38}" font-size="${ts}" text-anchor="middle" stroke="none">${label}</text></g>`;
+}
+function dimV(y1,y2,xF,xL,label,ts,sw,bad){
+  const s=xL<xF?-1:1,ext=ts*0.35,len=ts*0.45,inside=(y2-y1)>2.6*len;
+  let g=`<g class="dim${bad?' bad':''}" stroke-width="${sw}"><line x1="${xF}" y1="${y1}" x2="${xL+s*ext}" y2="${y1}"/><line x1="${xF}" y1="${y2}" x2="${xL+s*ext}" y2="${y2}"/>`;
+  if(inside)g+=`<line x1="${xL}" y1="${y1}" x2="${xL}" y2="${y2}"/>`+arrow(xL,y1,0,-1,len)+arrow(xL,y2,0,1,len);
+  else g+=`<line x1="${xL}" y1="${y1-2.2*len}" x2="${xL}" y2="${y2+2.2*len}"/>`+arrow(xL,y1,0,1,len)+arrow(xL,y2,0,-1,len);
+  const tx=xL-ts*0.38*(s<0?1:-1)*(s<0?1:-1)-ts*0.38,ty=(y1+y2)/2;
+  return g+`<text x="${xL-ts*0.38}" y="${ty}" font-size="${ts}" text-anchor="middle" stroke="none" transform="rotate(-90 ${xL-ts*0.38} ${ty})">${label}</text></g>`;
+}
+function geom(){
+  const p=S.p,X0=R.fc+p.eW,Y0=R.fc+p.eL;
+  const rowY=i=>i<R.up?Y0+i*(R.h+p.gc):Y0+R.up*R.h+(R.up-1)*p.gc+R.gmUse+(i-R.up)*(R.h+p.gc);
+  const colX=j=>X0+j*(p.a+p.gs);
+  return {X0,Y0,rowY,colX};
+}
+function scene(detail){
+  const p=S.p,{X0,Y0,rowY,colX}=geom();let s='';
+  if(R.fc>0)s+=`<rect class="c-frame" x="0" y="0" width="${R.W}" height="${R.L}"/>`;
+  s+=`<rect class="c-glass" x="${R.fc}" y="${R.fc}" width="${R.Wg}" height="${R.Lg}"/>`;
+  // ihlal bölgeleri
+  const z=(x,y,w,h)=>`<rect class="c-badz" x="${x}" y="${y}" width="${w}" height="${h}" stroke-width="${detail?0.15:3}"/>`;
+  if(R.bad.has('eW')){s+=z(R.fc,R.fc,p.eW,R.Lg)+z(R.fc+R.Wg-p.eW,R.fc,p.eW,R.Lg);}
+  if(R.bad.has('eL')){const e=Math.max(p.eL-p.bg-p.bw,0.01);s+=z(R.fc,R.fc,R.Wg,e)+z(R.fc,R.fc+R.Lg-e,R.Wg,e);}
+  const h=R.h;
+  const c=p.ch>0?Math.min(p.ch,p.a/2,h/2):0;
+  for(let j=0;j<R.nc;j++)for(let i=0;i<R.nr;i++){const x=colX(j),y=rowY(i);
+    if(!c){s+=`<rect class="c-cell" x="${x}" y="${y}" width="${p.a}" height="${h}"/>`;continue;}
+    // psödo-kare pah: tam hücrede 4 köşe, yarım hücrede dış kenardaki 2 köşe
+    const tp=!R.half||i%2===0,bt=!R.half||i%2===1,ct=tp?c:0,cb=bt?c:0,x2=x+p.a,y2=y+h;
+    s+=`<polygon class="c-cell" points="${x+ct},${y} ${x2-ct},${y} ${x2},${y+ct} ${x2},${y2-cb} ${x2-cb},${y2} ${x+cb},${y2} ${x},${y2-cb} ${x},${y+ct}"/>`;}
+  // teller (BC'de önde tel yok)
+  if(p.tech!=='BC'&&p.tech!=='MWT'){
+    const pitch=p.a/p.nbb;const segs=R.half&&R.lo>0?[[rowY(0),rowY(R.up-1)+h],[rowY(R.up),rowY(R.nr-1)+h]]:[[rowY(0),rowY(R.nr-1)+h]];
+    for(let j=0;j<R.nc;j++)for(let k=0;k<p.nbb;k++){const x=colX(j)+pitch*(k+0.5);
+      for(const [y1,y2] of segs){
+        if(detail)s+=`<rect class="c-wiref" x="${x-p.dw/2}" y="${y1+p.ov}" width="${p.dw}" height="${y2-y1-2*p.ov}"/>`;
+        else s+=`<line class="c-wire" x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke-width="0.6" vector-effect="non-scaling-stroke" opacity="0.55"/>`;}}
+  }
+  // bus ribbon (ön, üst/alt)
+  const yb1=Y0-p.bg-p.bw,yb2=Y0+R.blockL+p.bg;
+  s+=`<rect class="c-bus" x="${X0}" y="${yb1}" width="${R.blockW}" height="${p.bw}"/><rect class="c-bus" x="${X0}" y="${yb2}" width="${R.blockW}" height="${p.bw}"/>`;
+  // arka: orta bus ve J-box'lar (kesikli)
+  const swr=detail?0.12:2.2;
+  if(R.half&&R.lo>0){const ym=rowY(R.up)-R.gmUse/2;s+=`<line class="c-rear" x1="${X0}" y1="${ym}" x2="${X0+R.blockW}" y2="${ym}" stroke-width="${swr}"/>`;
+    const nj=p.nJB;for(let k=0;k<nj;k++){const cx=X0+R.blockW*(nj===1?0.5:(k*2+1)/(nj*2));s+=`<rect class="c-rear" x="${cx-45}" y="${ym-35}" width="90" height="70" stroke-width="${swr}"/>`;}}
+  else{const nj=p.nJB;const ym=R.fc+p.eL+120;for(let k=0;k<nj;k++){const cx=X0+R.blockW*(nj===1?0.5:(k*2+1)/(nj*2));s+=`<rect class="c-rear" x="${cx-45}" y="${ym-35}" width="90" height="70" stroke-width="${swr}"/>`;}}
+  return s;
+}
+function renderDrawings(){
+  const p=S.p,ts=46,sw=2.4,M=ts*3.6;
+  const {X0,Y0,rowY,colX}=geom();
+  let d=scene(false);
+  d+=dimH(0,R.W,0,-ts*1.6,'Dış '+f(R.W,1),ts,sw,R.bad.has('W'));
+  d+=dimH(R.fc,R.fc+R.Wg,R.L,R.L+ts*1.6,'Cam '+f(R.Wg,1),ts,sw,false);
+  d+=dimV(0,R.L,0,-ts*1.6,'Dış '+f(R.L,1),ts,sw,R.bad.has('L'));
+  d+=dimV(R.fc,R.fc+R.Lg,R.W,R.W+ts*1.6,'Cam '+f(R.Lg,1),ts,sw,false);
+  // detay işaretleri
+  const call=(x,y,r,t)=>`<circle class="c-call" cx="${x}" cy="${y}" r="${r}" stroke-width="3"/><text class="call" x="${x+r*0.75}" y="${y-r*0.75}" font-size="${ts*0.9}">${t}</text>`;
+  d+=call(R.fc+p.eW/2+10,R.fc+p.eL/2+10,70,'A');
+  d+=call(colX(1)-p.gs/2,rowY(1)-p.gc/2,40,'B');
+  if(R.half&&R.lo>0)d+=call(colX(1)-p.gs/2,rowY(R.up)-R.gmUse/2,40,'C');
+  const vb=`${-M} ${-M} ${R.W+2*M} ${R.L+2*M}`;
+  const svg=cls=>`<svg class="${cls}" viewBox="${vb}" role="img" aria-label="Modül üstten görünüm, ${f(R.L,1)} × ${f(R.W,1)} mm">${d}</svg>`;
+  $('#drawMain').innerHTML=svg('main');$('#drawSide').innerHTML=svg('main');
+  // detaylar
+  const det=(id,title,x0,y0,w,h,dims)=>{const ts2=w/11,sw2=ts2*0.07,m=ts2*3.4;
+    return `<figure><figcaption>${title}</figcaption><svg viewBox="${x0-m} ${y0-m} ${w+2*m} ${h+2*m}" role="img" aria-label="${title}"><defs><clipPath id="cp-${id}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#cp-${id})">${scene(true)}</g><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="none" stroke="var(--line)" stroke-width="${sw2}"/>${dims(ts2,sw2,m)}</svg></figure>`;};
+  let html='';
+  const wA=Math.max(R.fc+p.eW+22,30),hA=Math.max(R.fc+p.eL+22,30);
+  html+=det('A','DETAY A · köşe',0,0,wA,hA,(t,sw2)=>{
+    let g=dimH(0,R.fc,0,-t*1.5,f(R.fc,1),t,sw2,false)+dimH(R.fc,R.fc+p.eW,0,-t*1.5,f(p.eW,2),t,sw2,R.bad.has('eW'));
+    const yb=R.fc+p.eL-p.bg-p.bw;
+    g+=dimV(0,R.fc,0,-t*1.5,f(R.fc,1),t,sw2,false)+dimV(R.fc,yb,0,-t*1.5,f(yb-R.fc,2),t,sw2,R.bad.has('eL'));
+    g+=dimV(yb,yb+p.bw,wA,wA+t*1.5,f(p.bw,1),t,sw2,false)+dimV(yb+p.bw,R.fc+p.eL,wA,wA+t*1.5,f(p.bg,1),t,sw2,false);
+    g+=dimV(R.fc,R.fc+p.eL,wA,wA+t*3.0,'e '+f(p.eL,1),t,sw2,false);return g;});
+  const bx=colX(1)-p.gs/2,by=rowY(1)-p.gc/2,wB=Math.max(p.gs*6,16),hB=Math.max(p.gc*8,12);
+  html+=det('B','DETAY B · hücre aralıkları',bx-wB/2,by-hB/2,wB,hB,(t,sw2)=>
+    dimH(colX(1)-p.gs,colX(1),by-hB/2,by-hB/2-t*1.5,'g_s '+f(p.gs,2),t,sw2,R.bad.has('gs'))+
+    dimV(rowY(1)-p.gc,rowY(1),bx-wB/2,bx-wB/2-t*1.5,'g '+f(p.gc,2),t,sw2,R.bad.has('gc')));
+  if(R.half&&R.lo>0){const cy=rowY(R.up)-R.gmUse/2,wC=Math.max(p.gs*6,16),hC=Math.max(R.gmUse*2.5,12);
+    html+=det('C','DETAY C · orta boşluk',bx-wC/2,cy-hC/2,wC,hC,(t,sw2)=>dimV(rowY(R.up)-R.gmUse,rowY(R.up),bx-wC/2,bx-wC/2-t*1.5,'g_m '+f(R.gmUse,2),t,sw2,R.bad.has('gm')));}
+  $('#drawDetails').innerHTML=html+`<p class="note" style="grid-column:1/-1">Hücre parçası ${f(p.a,1)} × ${f(R.h,2)} mm · ${(p.tech!=='BC'&&p.tech!=='MWT')?`${p.nbb} tel, ${f(p.dw,2)} mm`:p.tech+': ön yüzde tel yok'} · Hücre bloğu ${f(R.blockW,1)} × ${f(R.blockL,1)} mm</p>`;
+}
+
+/* ---- CTM ---- */
+function renderCTM(){
+  $('#ctmStats').innerHTML=[['Σ Hücre gücü',f(R.Pcells,1)+' W'],['Modül Pmax',f(R.P,1)+' W',1],['CTM oranı',f(R.CTM,2)+' %',1],['Modül verimi',f(R.eta,2)+' %'],['Cam alanı verimi',f(R.etaG,2)+' %'],['Hücre sayısı',`${R.N} parça (${R.Nfull} tam)`]]
+    .map(([i,b,h])=>`<div class="stat${h?' hl':''}"><i>${i}</i><b>${b}</b></div>`).join('');
+  const st=R.steps.filter(s=>Math.abs(s.k-1)>1e-9);
+  const mx=Math.max(...st.map(s=>Math.abs(s.dPct)),0.5);
+  let h='<div class="h">Faktör</div><div class="h">Δ (%)</div><div class="h" style="text-align:right">k</div><div class="h w" style="text-align:right">ΔW</div>';
+  for(const s of st){const w=Math.abs(s.dPct)/mx*50;
+    h+=`<div class="lbl">${esc(s.l)}<small>${esc(s.note)}</small></div><div class="barw"><span class="${s.dPct>=0?'g':'l'}" style="width:${w}%"></span></div><div class="v">${f(s.k,4)}</div><div class="v w ${s.dW>=0?'':''}">${fs(s.dW,2)}</div>`;}
+  h+=`<div class="lbl sum">Toplam CTM</div><div class="sum v" style="text-align:left">${fs(R.CTM-100,2)} %</div><div class="v sum">${f(R.CTM/100,4)}</div><div class="v w sum">${fs(R.P-R.Pcells,1)}</div>`;
+  $('#chain').innerHTML=h;
+  const tr=(a,b)=>`<tr><td>${a}</td><td class="n">${b}</td></tr>`;
+  $('#elecTbl').innerHTML=tr('Pmax',f(R.P,1)+' W')+tr('Voc',f(R.Voc,2)+' V')+tr('Isc',f(R.Isc,2)+' A')+tr('Vmp',f(R.Vmp,2)+' V')+tr('Imp',f(R.Imp,2)+' A')+tr('Dolum faktörü (FF)',f(R.FF*100,2)+' %')+tr('Bağlantı',`${R.Ns} seri × ${R.Np} paralel`)+tr('Not','Voc sıcaklık etkisi yok, STC');
+  $('#ctmDetail').innerHTML=tr('Tel akımı I_w',f(R.Iw,3)+' A')+tr('Tel kesiti',f(R.Aw,4)+' mm²')+tr('Tel R′',f(R.Rw*1000,1)+' mΩ/m')+tr('Hücre üstü tel boyu ℓ',f(R.lOn,1)+' mm')
+    +tr('Tel kaybı',f(R.Pw,2)+' W')+tr('Bus R′',f(R.Rbus*1000,2)+' mΩ/m')+tr('Bus kaybı',f(R.Pbus,2)+' W')+tr('Kablo direnci (2 kutup)',f(R.Rcab*1000,2)+' mΩ')
+    +tr('J-box/kablo kaybı',f(R.Pj,2)+' W')+tr('Etkin gap alanı',f(R.Agap/1e6,4)+' m² ('+f(R.Agap/R.Acells*100,2)+' %)')+tr('Arka yansıtma R_arka',f(S.p.Rb,2))+tr('Mismatch δ',f(R.dmm,2)+' %');
+}
+let calK=null;
+$('#calSample').onclick=()=>{const base=R.Pcells;const r=mulberry32(7);let t='';for(let i=0;i<12;i++){const c=base*(1+(r()-0.5)*0.01);t+=`${f(c,1)} ; ${f(c*0.962*(1+(r()-0.5)*0.008),1)}\n`;}$('#calData').value=t.trim();$('#calOut').textContent='Örnek veri yüklendi (gerçek ölçüm değil).';};
+$('#calRun').onclick=()=>{
+  const rows=$('#calData').value.split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/[;\t|]/).map(parseNum));
+  const pts=[];for(const r of rows){if(r.length>=2&&r[0]>0&&r[1]>0)pts.push([r[0],r[1]]);else if(r.length===1&&r[0]>0)pts.push([R.Pcells,r[0]]);}
+  if(pts.length<1){$('#calOut').innerHTML='<span style="color:var(--bad)">Geçerli satır bulunamadı. Biçim: ΣHücre_W ; Modül_W</span>';calK=null;$('#calApply').disabled=true;return;}
+  const ctm0=R.CTM/100/S.p.kCal;const meas=pts.map(([c,m])=>m/c);const st=stats(meas);
+  calK=st.mean/ctm0;
+  const rm=k=>Math.sqrt(pts.reduce((s,[c,m])=>s+(m-c*ctm0*k)**2,0)/pts.length);
+  $('#calOut').innerHTML=`n = ${pts.length} · ölçülen CTM ort. <b>${f(st.mean*100,2)} %</b> (σ ${f(st.sd*100,2)} %) · model CTM (k_kal hariç) ${f(ctm0*100,2)} %<br>Önerilen k_kal = <b class="mono">${f(calK,4)}</b> · RMSE: mevcut ${f(rm(S.p.kCal),2)} W → kalibre ${f(rm(calK),2)} W`;
+  $('#calApply').disabled=false;};
+$('#calApply').onclick=()=>{if(calK){S.p.kCal=+calK.toFixed(4);syncInputs();schedule(true);$('#calApply').disabled=true;$('#calOut').insertAdjacentHTML('beforeend','<br><span style="color:var(--good)">k_kal uygulandı.</span>');}};
+
+/* ---- Monte Carlo ---- */
+$('#mcRun').onclick=()=>{const b=$('#mcRun');b.disabled=true;b.textContent='Çalışıyor…';setTimeout(()=>{const t0=performance.now();MC=runMC(S.p,S.t);MC.ms=performance.now()-t0;MCstale=false;renderMC();b.disabled=false;b.textContent='Simülasyonu çalıştır';},30);};
+function hist(arr,st,o){
+  const W=420,H=200,ml=34,mr=10,mt=14,mb=34,nb=36;
+  let lo=st.min,hi=st.max;if(o.marks)for(const m of o.marks){lo=Math.min(lo,m.x);hi=Math.max(hi,m.x);}
+  const pad=(hi-lo)*0.04||1;lo-=pad;hi+=pad;
+  const bw=(hi-lo)/nb,cnt=new Array(nb).fill(0);for(const x of arr){let i=Math.floor((x-lo)/bw);if(i>=nb)i=nb-1;if(i<0)i=0;cnt[i]++;}
+  const cm=Math.max(...cnt),X=x=>ml+(x-lo)/(hi-lo)*(W-ml-mr),Y=c=>H-mb-c/cm*(H-mt-mb);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.title)} histogramı">`;
+  s+=`<line class="axis" x1="${ml}" y1="${H-mb}" x2="${W-mr}" y2="${H-mb}"/>`;
+  for(let i=0;i<nb;i++)if(cnt[i])s+=`<rect class="bar" x="${X(lo+i*bw)+0.5}" y="${Y(cnt[i])}" width="${Math.max((W-ml-mr)/nb-1,0.5)}" height="${H-mb-Y(cnt[i])}"/>`;
+  const ticks=5;for(let i=0;i<=ticks;i++){const v=lo+(hi-lo)*i/ticks;s+=`<text x="${X(v)}" y="${H-mb+14}" text-anchor="middle">${f(v,o.dec)}</text>`;}
+  s+=`<text x="${(ml+W-mr)/2}" y="${H-4}" text-anchor="middle">${esc(o.unit)}</text>`;
+  s+=`<text x="4" y="${mt}" >n</text><text x="${ml-4}" y="${Y(cm)+4}" text-anchor="end">${cm}</text>`;
+  for(const m of o.marks||[])s+=`<line class="${m.cls}" x1="${X(m.x)}" y1="${mt}" x2="${X(m.x)}" y2="${H-mb}"/><text x="${X(m.x)+3}" y="${mt+10}" style="fill:${m.cls==='mk'?'var(--bad)':'var(--fg)'}">${esc(m.l)}</text>`;
+  return s+'</svg>';
+}
+function pill(p){const ppm=p*1e6;const c=p<0.0027?'good':p<0.01?'warn':'bad';return `<span class="pill ${c}">${p<0.0001&&p>0?f(ppm,0)+' ppm':f(p*100,2)+' %'}</span>`;}
+function renderMC(){
+  const p=S.p,sP=stats(MC.P),sE=stats(MC.E),sS=stats(MC.eS),sB=stats(MC.eB),sL=stats(MC.Ls),sW=stats(MC.Ws);
+  const cpkL=(st,mn)=>(st.mean-mn)/(3*st.sd),cpkU=(st,mx)=>(mx-st.mean)/(3*st.sd);
+  const bins={};for(const x of MC.P){const b=Math.floor(x/p.bin)*p.bin;bins[b]=(bins[b]||0)+1;}
+  const binRows=Object.keys(bins).map(Number).sort((a,b)=>b-a).map(b=>`<tr><td>${f(b,p.bin%1?1:0)} W</td><td class="n">${f(bins[b]/MC.n*100,2)} %</td><td><span class="share" style="width:${bins[b]/MC.n*160}px"></span></td></tr>`).join('');
+  const pr=MC.prob;
+  const pr_=(l,v,extra='')=>`<tr><td>${l}</td><td class="n">${pill(v)}</td><td class="n">${extra}</td></tr>`;
+  $('#mcOut').innerHTML=`
+  ${MCstale?'<p class="chip warn" style="align-self:flex-start">Girdiler değişti, sonuçlar eski. Yeniden çalıştırın.</p>':''}
+  <div class="stats">
+    <div class="stat hl"><i>Pmax ort. ± σ</i><b>${f(sP.mean,1)} ± ${f(sP.sd,2)} W</b></div>
+    <div class="stat"><i>Pmax P5 / P95</i><b>${f(sP.p5,1)} / ${f(sP.p95,1)}</b></div>
+    <div class="stat hl"><i>Verim ort. ± σ</i><b>${f(sE.mean,2)} ± ${f(sE.sd,3)} %</b></div>
+    <div class="stat"><i>Etiket altı (&lt; ${f(p.Pplate,0)} W)</i><b>${f(pr.Pplate*100,2)} %</b></div>
+    <div class="stat"><i>Boyut ihlali (herhangi)</i><b>${f(pr.dimAny*100,2)} %</b></div>
+    <div class="stat"><i>Süre</i><b>${f(MC.n,0)} it. · ${f(MC.ms,0)} ms</b></div>
+  </div>
+  <div class="grid2">
+    <div class="hist"><h3>Pmax dağılımı</h3>${hist(MC.P,sP,{title:'Pmax',unit:'W',dec:0,marks:[{x:p.Pplate,l:'etiket',cls:'mk'},{x:sP.mean,l:'ort.',cls:'mk2'}]})}</div>
+    <div class="hist"><h3>Modül verimi dağılımı</h3>${hist(MC.E,sE,{title:'Verim',unit:'%',dec:2,marks:[{x:sE.mean,l:'ort.',cls:'mk2'}]})}</div>
+  </div>
+  <div class="grid2">
+    <div><h3>Sınır ihlali olasılıkları</h3><div class="tw"><table><tr><th>Kontrol</th><th class="n">Olasılık</th><th class="n">Cpk</th></tr>
+      ${pr_(`Yan kenar < ${f(p.eMin,1)} mm`,pr.eSide,f(cpkL(sS,p.eMin),2))}
+      ${pr_(`Bus–cam kenarı < ${f(p.eMin,1)} mm`,pr.eBus,f(cpkL(sB,p.eMin),2))}
+      ${pr_(`Modül boyu > ${f(p.Lmax,0)} mm`,pr.L,f(cpkU(sL,p.Lmax),2))}
+      ${pr_(`Modül genişliği > ${f(p.Wmax,0)} mm`,pr.W,f(cpkU(sW,p.Wmax),2))}
+      ${pr_(`Herhangi bir hücre boşluğu < ${f(p.gcMin,2)} mm`,pr.gc,'analitik')}
+      ${pr_(`Herhangi bir string aralığı < ${f(p.gsMin,2)} mm`,pr.gs,'analitik')}
+      ${R.half?pr_(`Orta boşluk < ${f(p.gmMin,2)} mm`,pr.gm,'analitik'):''}
+      ${pr_(`Pmax < etiket ${f(p.Pplate,0)} W`,pr.Pplate,'')}
+    </table></div>
+    <p class="note">Yeşil &lt; 0,27 % (≈3σ), sarı &lt; 1 %, kırmızı ≥ 1 %. Boşluk ihlalleri her boşluğun bağımsız olduğu varsayımıyla 1 − (1 − p)<sup>n</sup> formülünden hesaplanır.</p></div>
+    <div><h3>Güç sınıfı dağılımı</h3><div class="tw"><table><tr><th>Sınıf</th><th class="n">Pay</th><th></th></tr>${binRows}</table></div>
+    <p class="note">Kenar mesafesi ort.: yan ${f(sS.mean,2)} mm (σ ${f(sS.sd,2)}), bus–kenar ${f(sB.mean,2)} mm (σ ${f(sB.sd,2)}). Dış ölçü ort. ${f(sL.mean,1)} × ${f(sW.mean,1)} mm.</p></div>
+  </div>`;
+}
+
+/* ---- Maliyet ---- */
+function renderCost(){
+  const b=R.bom,c=S.p.cur;
+  const top=[...b.lines].sort((x,y)=>y.cost-x.cost)[0];
+  $('#costStats').innerHTML=[['Modül maliyeti',c+f(b.total,2),1],[c+'/W',f(b.perW,4),1],['Malzeme (BOM)',c+f(b.mat,2)],['Üretim giderleri',c+f(b.sub-b.mat,2)],['Yield karşılığı',c+f(b.yieldLoss,2)],['En büyük kalem',`${top.l} · ${f(top.cost/b.total*100,1)} %`]]
+    .map(([i,v,h])=>`<div class="stat${h?' hl':''}"><i>${i}</i><b>${esc(v)}</b></div>`).join('');
+  let h=`<tr><th>Kalem</th><th class="n">Miktar</th><th class="n">Birim fiyat</th><th class="n">Fire %</th><th class="n">Tutar</th><th class="n">Pay</th></tr>`;let g='';
+  for(const x of b.lines){
+    if(x.g!==g){g=x.g;const gs=b.lines.filter(y=>y.g===g).reduce((s,y)=>s+y.cost,0);h+=`<tr class="grp"><td colspan="4">${esc(g)}</td><td class="n">${c}${f(gs,2)}</td><td class="n">${f(gs/b.total*100,1)} %</td></tr>`;}
+    const qd=x.q<0.1?4:x.q<10?3:1;
+    h+=`<tr><td>${esc(x.l)}<br><small>${esc(x.spec)}</small></td><td class="n">${f(x.q,qd)} ${esc(x.u)}</td>
+      <td class="n"><input type="text" inputmode="decimal" data-k="pr_${x.id}" data-pk="1" value="${fmtIn(+x.price.toFixed(4))}" aria-label="${esc(x.l)} birim fiyat"><br><small>${esc(x.pu)}</small></td>
+      <td class="n"><input type="text" inputmode="decimal" data-k="fw_${x.id}" data-pk="1" value="${fmtIn(x.w)}" aria-label="${esc(x.l)} fire" style="width:3.6rem"></td>
+      <td class="n">${c}${f(x.cost,3)}</td><td class="n">${f(x.cost/b.total*100,1)} %</td></tr>`;
+  }
+  h+=`<tr class="grp"><td colspan="4">Üretim verimi ${f(S.p.yield,1)} % karşılığı</td><td class="n">${c}${f(b.yieldLoss,2)}</td><td class="n">${f(b.yieldLoss/b.total*100,1)} %</td></tr>`;
+  h+=`<tr class="tot"><td colspan="4">Toplam (modül başı) · ${f(R.P,1)} W</td><td class="n">${c}${f(b.total,2)}</td><td class="n">${f(b.perW,4)} ${c}/W</td></tr>`;
+  const active=document.activeElement;const ak=active&&active.dataset?active.dataset.k:null;const sel=ak&&active.selectionStart;
+  $('#bomTbl').innerHTML=h;
+  if(ak&&ak.match(/^(pr|fw)_/)){const el=$(`#bomTbl [data-k="${ak}"]`);if(el){el.focus();try{el.setSelectionRange(sel,sel);}catch(e){}}}
+}
+function renderLib(){
+  const PU={fmt:'',tech:'/W',wire:'/kg',coat:'/kg (ek)',join:'/modül',bus:'/kg',insul:'/m',flux:'/kg',glassF:'/m²',rear:'/m²',enc:'/kg',jbox:'/set',cable:'/m',conn:'/çift',pot:'/kg',frame:'/kg',fseal:'',edge:'',pack:'/palet'};
+  const c=S.p.cur;let n=0;
+  $('#libBox').innerHTML=Object.entries(LIB).map(([k,cat])=>{const it=Object.values(cat.items);n+=it.length;
+    const pr=x=>{const v=k==='pack'?x.pal+x.car+x.str:k==='coat'?x.add:k==='join'?x.cost:x.price;if(v===undefined)return '–';return (k==='coat'&&v>0?'+':'')+c+f(v,k==='tech'?3:2)+(PU[k]||(x.unit?'/'+x.unit:''));};
+    const info=x=>[x.spec,x.Rb!==undefined?'R_arka '+f(x.Rb,2):'',x.rb!==undefined?'gap yansıtma '+f(x.rb,2):'',x.T?'T '+f(x.T,1)+' %':'',x.rho?f(x.rho,2)+' g/cm³':'',x.set&&x.set.kc?'direnç çarpanı '+f(x.set.kc,2):'',x.set&&x.set.conR!==undefined?f(x.set.conR,2)+' mΩ':'',x.set&&x.set.fkg?f(x.set.fkg,2)+' kg/m':'',x.set&&x.set.nPal?x.set.nPal+' modül/palet':''].filter(Boolean).join(' · ');
+    return `<details><summary>${esc(cat.l)} <small>(${it.length})</small></summary><div class="tw"><table><tr><th>Varyant</th><th>Özellik</th><th class="n">Örnek fiyat</th></tr>${it.map(x=>`<tr><td>${esc(x.l)}</td><td><small>${esc(info(x))}</small></td><td class="n">${esc(pr(x))}</td></tr>`).join('')}</table></div></details>`;}).join('');
+  $('#libCount').textContent=n+' varyant · '+Object.keys(LIB).length+' kategori';
+}
+
+
+/* ---- Karşılaştırma ---- */
+function saveLS(){LS.set('pvmt2.saved',SAVED);LS.set('pvmt2.cmp',CMP);}
+$('#saveSlot').onclick=()=>{const id='d'+Date.now().toString(36);SAVED.push({id,name:S.name,p:JSON.parse(JSON.stringify(S.p)),t:JSON.parse(JSON.stringify(S.t)),at:new Date().toISOString()});CMP.sel.push(id);if(!SAVED.find(x=>x.id===CMP.ref))CMP.ref=id;saveLS();renderCompare();};
+function renderCompare(){
+  const list=$('#savedList');
+  list.innerHTML=SAVED.length?SAVED.map(d=>`<div class="saved"><div><input type="checkbox" data-csel="${d.id}" ${CMP.sel.includes(d.id)?'checked':''} aria-label="Karşılaştır"> <input type="radio" name="cref" data-cref="${d.id}" ${CMP.ref===d.id?'checked':''} aria-label="Referans"></div>
+    <div class="nm"><b>${esc(d.name)}${d.ex?'<span class="tag">örnek</span>':''}</b><small>${d.at?new Date(d.at).toLocaleString('tr-TR'):''}</small></div>
+    <div class="btns"><button class="btn sm" data-cload="${d.id}">Yükle</button><button class="btn sm" data-cdel="${d.id}">Sil</button></div></div>`).join(''):'<p class="note">Kayıtlı tasarım yok. "Mevcut tasarımı kaydet" ile ekleyin.</p>';
+  const ds=SAVED.filter(d=>CMP.sel.includes(d.id));
+  if(!ds.length){$('#cmpTbl').innerHTML='<p class="note">Karşılaştırmak için en az bir tasarım işaretleyin.</p>';$('#cmpDiff').innerHTML='';return;}
+  const ref=SAVED.find(d=>d.id===CMP.ref)||ds[0];
+  const ev=d=>{const b=defaults();const p=Object.assign(b.p,d.p);return {d,p,R:evaluate(p)};};
+  const E=[ev(ref),...ds.filter(d=>d!==ref).map(ev)];
+  const c=S.p.cur;
+  const M=[['Pmax','W',1,r=>r.P,1],['Modül verimi','%',2,r=>r.eta,1],['CTM','%',2,r=>r.CTM,1],['Modül maliyeti',c,2,r=>r.bom.total,-1],[c+'/W','',4,r=>r.bom.perW,-1],
+    ['Modül boyu','mm',1,r=>r.L,0],['Modül genişliği','mm',1,r=>r.W,0],['Alan','m²',3,r=>r.Amod/1e6,0],['Aktif alan oranı','%',2,r=>r.AAR,1],['Ağırlık','kg',1,r=>r.mass.total,-1],['Voc','V',2,r=>r.Voc,0],['Isc','A',2,r=>r.Isc,0],['Sınır ihlali','adet',0,r=>r.viol.length,-1]];
+  let h=`<table><tr><th>Metrik</th>${E.map((e,i)=>`<th class="n">${i===0?'◉ ':''}${esc(e.d.name)}</th>`).join('')}</tr>`;
+  for(const [l,u,d,fn,better] of M){const r0=fn(E[0].R);
+    h+=`<tr><td>${esc(l)} <small>${esc(u)}</small></td>`+E.map((e,i)=>{const v=fn(e.R);if(i===0)return `<td class="n">${f(v,d)}</td>`;
+      const dv=v-r0,cls=better===0||Math.abs(dv)<1e-12?'':(dv*better>0?'pos':'neg');
+      return `<td class="n">${f(v,d)}<br><span class="${cls}" style="font-size:12px">${fs(dv,d)}${r0&&u!=='adet'?` (${fs(dv/r0*100,2)} %)`:''}</span></td>`;}).join('')+'</tr>';}
+  $('#cmpTbl').innerHTML=h+'</table><p class="note">Δ değerleri referansa (◉) göredir. Yeşil daha iyi, turuncu daha kötü.</p>';
+  // farklı girdiler
+  const keys=SCHEMA.map(s=>s.k).filter(k=>!['n','seed','dist','bin','cur'].includes(k));
+  const fmtV=(k,v)=>{const s=SCH[k];if(s.type==='lib')return (LIB[s.lib].items[v]||{l:v}).l;if(s.type==='bool')return v?'evet':'hayır';if(s.type==='sel')return v;return f(v,4).replace(/0+$/,'').replace(/,$/,'')+' '+s.u;};
+  const rows=keys.filter(k=>E.some(e=>JSON.stringify(e.p[k])!==JSON.stringify(E[0].p[k])));
+  $('#cmpDiff').innerHTML=rows.length?`<table><tr><th>Girdi</th>${E.map((e,i)=>`<th>${i===0?'◉ ':''}${esc(e.d.name)}</th>`).join('')}</tr>${rows.map(k=>`<tr><td>${esc(SCH[k].l)}</td>${E.map(e=>`<td>${esc(fmtV(k,e.p[k]))}</td>`).join('')}</tr>`).join('')}</table>`:'<p class="note">Seçili tasarımların girdileri aynı.</p>';
+}
+$('#savedList').addEventListener('click',e=>{const t=e.target;
+  if(t.dataset.cload){const d=SAVED.find(x=>x.id===t.dataset.cload);if(d){const b=defaults();S={name:d.name,p:Object.assign(b.p,JSON.parse(JSON.stringify(d.p))),t:Object.assign(b.t,d.t||{}),tpl:''};MC=null;$('#mcOut').innerHTML='<p class="note">Henüz çalıştırılmadı.</p>';syncInputs();recompute();go('tasarim');}}
+  if(t.dataset.cdel){SAVED=SAVED.filter(x=>x.id!==t.dataset.cdel);CMP.sel=CMP.sel.filter(x=>x!==t.dataset.cdel);if(CMP.ref===t.dataset.cdel)CMP.ref=SAVED[0]?SAVED[0].id:'';saveLS();renderCompare();}});
+$('#savedList').addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.csel){if(t.checked){if(!CMP.sel.includes(t.dataset.csel))CMP.sel.push(t.dataset.csel);}else CMP.sel=CMP.sel.filter(x=>x!==t.dataset.csel);saveLS();renderCompare();}
+  if(t.dataset.cref){CMP.ref=t.dataset.cref;if(!CMP.sel.includes(CMP.ref))CMP.sel.push(CMP.ref);saveLS();renderCompare();}});
+
+/* ---- Kayıt: JSON / Excel ---- */
+const designJSON=()=>({schema:'pv-modul-tasarim',version:1,name:S.name,saved:new Date().toISOString(),params:S.p,tolerances:S.t});
+function loadDesign(o){
+  if(!o||o.schema!=='pv-modul-tasarim'||!o.params)throw new Error('Bu dosya bir PV modül tasarımı değil (schema alanı eksik).');
+  const b=defaults();S={name:o.name||'Yüklenen tasarım',p:Object.assign(b.p,o.params),t:Object.assign(b.t,o.tolerances||{}),tpl:''};
+  MC=null;$('#mcOut').innerHTML='<p class="note">Henüz çalıştırılmadı.</p>';syncInputs();recompute();
+}
+const safeName=()=>(S.name||'tasarim').replace(/[^\wçğıöşüÇĞİÖŞÜ\-]+/g,'_').slice(0,60);
+async function saveFile(name,data){
+  const note=$('#dlNote');
+  if(DL){try{await DL.save({filename:name,data});note.className='msg ok';note.textContent=name+' kaydedildi.';}catch(e){note.className='msg er';note.textContent=e&&e.code==='declined'?'Kaydetme iptal edildi.':'Dosya kaydedilemedi ('+(e&&e.code||'hata')+').';}return;}
+  if(!window.claude){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);note.className='msg ok';note.textContent=name+' indirildi.';}
+}
+$('#dlJson').onclick=()=>saveFile(safeName()+'.json',JSON.stringify(designJSON(),null,2));
+$('#dlXlsx').onclick=()=>{
+  if(!window.XLSX){$('#dlNote').className='msg er';$('#dlNote').textContent='Excel kütüphanesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.';return;}
+  const X=window.XLSX,wb=X.utils.book_new(),c=S.p.cur;
+  const add=(n,rows,w)=>{const ws=X.utils.aoa_to_sheet(rows);if(w)ws['!cols']=w.map(x=>({wch:x}));X.utils.book_append_sheet(wb,ws,n);};
+  add('Girdiler',[['Grup','Parametre','Değer','Birim','Tolerans (±)'],...SCHEMA.map(s=>[GROUPS[s.g],s.l,s.type==='lib'?(LIB[s.lib].items[S.p[s.k]]||{l:S.p[s.k]}).l:S.p[s.k],s.u,S.t[s.k]??''])],[22,40,40,8,12]);
+  add('Sonuçlar',[['Metrik','Değer','Birim'],['Tasarım',S.name,''],['Modül Pmax',R.P,'W'],['Modül verimi',R.eta,'%'],['CTM',R.CTM,'%'],['Σ hücre gücü',R.Pcells,'W'],['Voc',R.Voc,'V'],['Isc',R.Isc,'A'],['Vmp',R.Vmp,'V'],['Imp',R.Imp,'A'],['FF',R.FF*100,'%'],
+    ['Modül boyu',R.L,'mm'],['Modül genişliği',R.W,'mm'],['Cam boyu',R.Lg,'mm'],['Cam genişliği',R.Wg,'mm'],['Modül alanı',R.Amod/1e6,'m²'],['Aktif alan oranı',R.AAR,'%'],['Ağırlık',R.mass.total,'kg'],
+    ['Modül maliyeti',R.bom.total,c],['Birim maliyet',R.bom.perW,c+'/W'],['Sınır ihlalleri',R.viol.map(v=>v.m).join(' | ')||'yok','']],[28,16,8]);
+  add('CTM',[['Faktör','Formül','k','Önce (W)','Sonra (W)','ΔW','Δ%'],...R.steps.map(s=>[s.l,s.note,s.k,s.P0,s.P1,s.dW,s.dPct]),['Toplam CTM','',R.CTM/100,R.Pcells,R.P,R.P-R.Pcells,R.CTM-100]],[32,34,10,10,10,10,10]);
+  add('BOM',[['Grup','Kalem','Özellik','Miktar','Birim','Birim fiyat','Fiyat birimi','Fire %','Tutar ('+c+')'],...R.bom.lines.map(x=>[x.g,x.l,x.spec,x.q,x.u,x.price*x.mult,x.pu+(x.mult!==1?' (×'+f(x.mult,2)+' W)':''),x.w,x.cost]),['','Yield karşılığı','','','','','','',R.bom.yieldLoss],['','TOPLAM','','','','','','',R.bom.total],['','Birim maliyet ('+c+'/W)','','','','','','',R.bom.perW]],[18,34,40,10,8,12,14,8,12]);
+  if(MC){const sP=stats(MC.P),sE=stats(MC.E);const rows=[['Metrik','Değer'],['İterasyon',MC.n],['Pmax ortalama (W)',sP.mean],['Pmax σ (W)',sP.sd],['Pmax P5',sP.p5],['Pmax P95',sP.p95],['Verim ortalama (%)',sE.mean],['Verim σ',sE.sd],
+    ['P(yan kenar < min)',MC.prob.eSide],['P(bus–kenar < min)',MC.prob.eBus],['P(L > maks)',MC.prob.L],['P(W > maks)',MC.prob.W],['P(hücre boşluğu < min)',MC.prob.gc],['P(string aralığı < min)',MC.prob.gs],['P(Pmax < etiket)',MC.prob.Pplate],[],['Örnek','Pmax (W)','Verim (%)','L (mm)','W (mm)','Yan kenar min (mm)','Bus–kenar min (mm)']];
+    for(let i=0;i<Math.min(MC.n,20000);i++)rows.push([i+1,MC.P[i],MC.E[i],MC.Ls[i],MC.Ws[i],MC.eS[i],MC.eB[i]]);
+    add('Monte Carlo',rows,[26,14,12,10,10,16,16]);}
+  const ds=SAVED.filter(d=>CMP.sel.includes(d.id));
+  if(ds.length){const rows=[['Tasarım','Pmax (W)','Verim (%)','CTM (%)','Maliyet ('+c+')',c+'/W','L (mm)','W (mm)','Ağırlık (kg)','ΔPmax','Δverim','Δmaliyet','Δ'+c+'/W']];
+    const ref=SAVED.find(d=>d.id===CMP.ref)||ds[0];const ev=d=>{const b=defaults();return evaluate(Object.assign(b.p,d.p));};const r0=ev(ref);
+    for(const d of [ref,...ds.filter(x=>x!==ref)]){const r=ev(d);rows.push([d.name+(d===ref?' (referans)':''),r.P,r.eta,r.CTM,r.bom.total,r.bom.perW,r.L,r.W,r.mass.total,r.P-r0.P,r.eta-r0.eta,r.bom.total-r0.bom.total,r.bom.perW-r0.bom.perW]);}
+    add('Karşılaştırma',rows,[40,10,10,10,12,10,10,10,10,10,10,10,10]);}
+  const buf=X.write(wb,{bookType:'xlsx',type:'array'});
+  saveFile(safeName()+'.xlsx',new Blob([buf]));
+};
+$('#fileIn').onchange=e=>{const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();rd.onload=()=>{try{loadDesign(JSON.parse(rd.result));$('#dlNote').className='msg ok';$('#dlNote').textContent=fl.name+' yüklendi.';}catch(er){$('#dlNote').className='msg er';$('#dlNote').textContent='Yüklenemedi: '+er.message;}};rd.readAsText(fl);e.target.value='';};
+$('#jsonShow').onclick=()=>{$('#jsonBox').value=JSON.stringify(designJSON(),null,2);$('#jsonMsg').textContent='';};
+$('#jsonCopy').onclick=()=>{const t=$('#jsonBox');if(!t.value)t.value=JSON.stringify(designJSON(),null,2);const m=$('#jsonMsg');
+  navigator.clipboard.writeText(t.value).then(()=>{m.className='msg ok';m.textContent='Panoya kopyalandı.';}).catch(()=>{t.focus();t.select();m.className='msg';m.textContent='Metin seçildi; kopyalamak için Ctrl+C / Kopyala kullanın.';});};
+$('#jsonLoad').onclick=()=>{const m=$('#jsonMsg');try{loadDesign(JSON.parse($('#jsonBox').value));m.className='msg ok';m.textContent='Tasarım yüklendi.';}catch(e){m.className='msg er';m.textContent='JSON okunamadı: '+e.message;}};
+let resetArm=false;
+$('#resetBtn').onclick=()=>{const b=$('#resetBtn');if(!resetArm){resetArm=true;b.textContent='Emin misiniz? Tekrar dokunun';setTimeout(()=>{resetArm=false;b.textContent='Varsayılana dön';},3500);return;}
+  resetArm=false;b.textContent='Varsayılana dön';S=fromTemplate(TEMPLATES[0].id);MC=null;$('#mcOut').innerHTML='<p class="note">Henüz çalıştırılmadı.</p>';syncInputs();recompute();};
+
+/* ---- Sekmeler ---- */
+const TABS=['tasarim','cizim','ctm','tolerans','maliyet','karsilastir','kayit'];
+function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)go(b.dataset.tab);});
+
+/* ---- Başlat ---- */
+buildInputs();syncInputs();renderLib();recompute();go((location.hash||'').slice(1));
+(async()=>{
+  const note=$('#dlNote');
+  if(!window.claude||!window.claude.use){for(const b of $$('.dl'))b.hidden=false;return;}
+  note.textContent='İndirme hazırlanıyor…';
+  try{DL=await window.claude.use('downloads');}catch(e){DL=null;}
+  if(DL){for(const b of $$('.dl'))b.hidden=false;note.textContent='';}
+  else{note.className='msg';note.textContent='Bu görünümde dosya indirme kullanılamıyor. JSON’u aşağıdan kopyalayabilirsiniz.';}
+})();
+</script>
