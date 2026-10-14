@@ -59,14 +59,16 @@ function fromTemplate(id){
   for(const [k,v] of Object.entries(tp.set))if(k in SCH&&k!=='eta')d.p[k]=v;
   if(tp.set.eta)cellFrom(d.p,tp.set.eta);
   d.p.Rb=rearRb(d.p);d.p.Tf=(LIB.enc.items[d.p.encFV]||{T:99}).T;
-  if(tp.auto){const r=evaluate(d.p,true);d.p.Pplate=Math.floor(r.P/5)*5;d.p.Lmax=Math.ceil(r.L)+2;d.p.Wmax=Math.ceil(r.W)+2;}
+  if(tp.auto){const r=evaluate(d.p,true);d.p.Lmax=Math.ceil(r.L)+2;d.p.Wmax=Math.ceil(r.W)+2;}
+  // etiket gücü: ölçülen gücün ≥ %97,7'si etiketin üstünde kalacak şekilde (nominal − 2σ), sınıf adımına yuvarlanır
+  if(tp.auto||!('Pplate' in tp.set)){const r=evaluate(d.p,true);const sg=Math.sqrt(d.p.sP**2+d.p.sCTM**2+d.p.sMeas**2)/100;d.p.Pplate=Math.floor(r.P*(1-2*sg)/d.p.bin)*d.p.bin;}
   return {name:tp.l,p:d.p,t:d.t,tpl:tp.id};
 }
 
 /* ---- Durum ---- */
 libApplyUser(LS.get('pvm.userlib'));
 let S=(()=>{const dr=LS.get('pvm.draft');if(dr&&dr.p){const b=defaults();return {name:dr.name||'Tasarım',p:Object.assign(b.p,dr.p),t:Object.assign(b.t,dr.t||{}),tpl:dr.tpl||''};}return fromTemplate(TEMPLATES[0].id);})();
-let R=null,MC=null,MCstale=false,DL=null;
+let R=null,MC=null,DL=null;
 let SAVED=LS.get('pvm.saved');
 if(!Array.isArray(SAVED)){
   const a=fromTemplate('gg_tc_g12r'),b=fromTemplate('gg_tc_g12r');
@@ -86,6 +88,7 @@ function rowHTML(s){
     const opts=(s.type==='lib'?libOpts(s):s.opts).map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');
     return `<div class="row wide" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><select id="${id}" data-k="${s.k}">${opts}</select></div>`;
   }
+  if(s.type==='text')return `<div class="row wide" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><input type="text" id="${id}" data-k="${s.k}" class="txt"></div>`;
   if(s.type==='bool')return `<div class="row" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><div class="val"><input type="checkbox" id="${id}" data-k="${s.k}"></div><div></div></div>`;
   const tol=s.tol!==undefined?`<div class="tol"><span>±</span><input type="text" inputmode="decimal" id="tol-${s.k}" data-tol="${s.k}" aria-label="${esc(s.l)} toleransı"></div>`:'<div></div>';
   return `<div class="row" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><div class="val"><input type="text" inputmode="decimal" id="${id}" data-k="${s.k}"><span class="u">${esc(s.u)}</span></div>${tol}</div>`;
@@ -99,6 +102,7 @@ function buildInputs(){
   $('#inputsDesign').innerHTML=['cell','lay','int','mat','fr','lim'].map((g,i)=>groupHTML(g,i<2)).join('');
   $('#inputsCTM').innerHTML=groupHTML('ctm',false)+groupHTML('ds',false);
   $('#inputsMC').innerHTML=groupHTML('mc',true);
+  $('#inputsMech').innerHTML=groupHTML('mech',false);
   $('#inputsCost').innerHTML=groupHTML('cost',false);
   $('#in-cur').innerHTML=SCH.cur.opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   $('#tplSel').innerHTML='<option value="">— Şablon seçin —</option>'+Object.entries(ERAS).map(([e,el])=>`<optgroup label="${esc(el)}">${TEMPLATES.filter(t=>t.era===e).map(t=>`<option value="${t.id}">${esc(t.l)}</option>`).join('')}</optgroup>`).join('');
@@ -117,6 +121,7 @@ function onField(el){
   const s=SCH[k];
   if(el.dataset.pk){const v=parseNum(el.value);if(!(v>=0)){el.classList.add('err');return;}el.classList.remove('err');S.p[k]=v;schedule(true);return;}
   if(!s)return;
+  if(s.type==='text'){S.p[k]=el.value;schedule();return;}
   if(s.type==='bool'){S.p[k]=el.checked;}
   else if(s.type==='lib'){applyLib(S.p,k,el.value);syncInputs();}
   else if(s.type==='sel'){S.p[k]=el.value;}
@@ -136,14 +141,21 @@ document.addEventListener('input',e=>{const el=e.target;if(el.matches('input[typ
 document.addEventListener('change',e=>{const el=e.target;if(el.matches('select,input[type=checkbox]'))onField(el);});
 
 let tmr=null;
-function schedule(dirty){if(dirty&&MC)MCstale=true;clearTimeout(tmr);tmr=setTimeout(recompute,120);}
+function schedule(){clearTimeout(tmr);tmr=setTimeout(recompute,120);}
+/* Monte Carlo girdiler değiştikçe kendiliğinden yeniden çalışır (Tolerans sekmesi açıkken) */
+let mcTmr=null,mcKey='';
+const mcInputKey=()=>JSON.stringify([S.p,S.t]);
+function mcAuto(){const key=mcInputKey();if(MC&&key===mcKey)return;
+  if($('[data-panel="tolerans"]').hidden){if(key!==mcKey)MC=null;return;}
+  clearTimeout(mcTmr);$('#mcState').textContent='Hesaplanıyor…';
+  mcTmr=setTimeout(()=>{const t0=performance.now();MC=runMC(S.p,S.t);MC.ms=performance.now()-t0;mcKey=key;renderMC();},250);}
 
 /* ---- Hesap + çizim ---- */
 function recompute(){
   R=evaluate(S.p);
   LS.set('pvm.draft',{name:S.name,p:S.p,t:S.t,tpl:S.tpl});
   renderKPI();renderSummary();renderViol();renderDrawings();renderCTM();renderCost();renderCompare();
-  if(MC)renderMC();
+  mcAuto();
   for(const r of $$('.row[data-row]'))r.classList.toggle('bad',R.bad.has(r.dataset.row));
   $('#gs-cell').textContent=`${S.p.tech} · ${f(S.p.a,1)}×${f(S.p.b,1)} · ${f(S.p.P,2)} W`;
   $('#gs-lay').textContent=`${R.N} parça · ${R.nc}×${R.nr}${R.half?' half-cut':''}`;
@@ -242,7 +254,7 @@ function renderDrawings(){
   if(R.half&&R.lo>0)d+=call(colX(1)-p.gs/2,rowY(R.up)-R.gmUse/2,40,'C');
   const vb=`${-M} ${-M} ${R.W+2*M} ${R.L+2*M}`;
   const svg=cls=>`<svg class="${cls}" viewBox="${vb}" role="img" aria-label="Modül üstten görünüm, ${f(R.L,1)} × ${f(R.W,1)} mm">${d}</svg>`;
-  $('#drawMain').innerHTML=svg('main');$('#drawSide').innerHTML=svg('main');
+  if($('#drawMain'))$('#drawMain').innerHTML=svg('main');$('#drawSide').innerHTML=svg('main');
   // detaylar
   const det=(id,title,x0,y0,w,h,dims)=>{const ts2=w/11,sw2=ts2*0.07,m=ts2*3.4;
     return `<figure><figcaption>${title}</figcaption><svg viewBox="${x0-m} ${y0-m} ${w+2*m} ${h+2*m}" role="img" aria-label="${title}"><defs><clipPath id="cp-${id}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#cp-${id})">${scene(true)}</g><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="none" stroke="var(--line)" stroke-width="${sw2}"/>${dims(ts2,sw2,m)}</svg></figure>`;};
@@ -260,7 +272,7 @@ function renderDrawings(){
     dimV(rowY(1)-p.gc,rowY(1),bx-wB/2,bx-wB/2-t*1.5,'g '+f(p.gc,2),t,sw2,R.bad.has('gc')));
   if(R.half&&R.lo>0){const cy=rowY(R.up)-R.gmUse/2,wC=Math.max(p.gs*6,16),hC=Math.max(R.gmUse*2.5,12);
     html+=det('C','DETAY C · orta boşluk',bx-wC/2,cy-hC/2,wC,hC,(t,sw2)=>dimV(rowY(R.up)-R.gmUse,rowY(R.up),bx-wC/2,bx-wC/2-t*1.5,'g_m '+f(R.gmUse,2),t,sw2,R.bad.has('gm')));}
-  $('#drawDetails').innerHTML=html+`<p class="note" style="grid-column:1/-1">Hücre parçası ${f(p.a,1)} × ${f(R.h,2)} mm · ${(p.tech!=='BC'&&p.tech!=='MWT')?`${p.nbb} tel, ${f(p.dw,2)} mm`:p.tech+': ön yüzde tel yok'} · Hücre bloğu ${f(R.blockW,1)} × ${f(R.blockL,1)} mm</p>`;
+  if($('#drawDetails'))$('#drawDetails').innerHTML=html+`<p class="note" style="grid-column:1/-1">Hücre parçası ${f(p.a,1)} × ${f(R.h,2)} mm · ${(p.tech!=='BC'&&p.tech!=='MWT')?`${p.nbb} tel, ${f(p.dw,2)} mm`:p.tech+': ön yüzde tel yok'} · Hücre bloğu ${f(R.blockW,1)} × ${f(R.blockL,1)} mm</p>`;
 }
 
 /* ---- CTM ---- */
@@ -299,7 +311,7 @@ $('#calRun').onclick=()=>{
 $('#calApply').onclick=()=>{if(calK){S.p.kCal=+calK.toFixed(4);syncInputs();schedule(true);$('#calApply').disabled=true;$('#calOut').insertAdjacentHTML('beforeend','<br><span style="color:var(--good)">k_kal uygulandı.</span>');}};
 
 /* ---- Monte Carlo ---- */
-$('#mcRun').onclick=()=>{const b=$('#mcRun');b.disabled=true;b.textContent='Çalışıyor…';setTimeout(()=>{const t0=performance.now();MC=runMC(S.p,S.t);MC.ms=performance.now()-t0;MCstale=false;renderMC();b.disabled=false;b.textContent='Simülasyonu çalıştır';},30);};
+$('#mcRun').onclick=()=>{mcKey='';MC=null;mcAuto();};
 function hist(arr,st,o){
   const W=420,H=200,ml=34,mr=10,mt=14,mb=34,nb=36;
   let lo=st.min,hi=st.max;if(o.marks)for(const m of o.marks){lo=Math.min(lo,m.x);hi=Math.max(hi,m.x);}
@@ -317,20 +329,22 @@ function hist(arr,st,o){
 }
 function pill(p){const ppm=p*1e6;const c=p<0.0027?'good':p<0.01?'warn':'bad';return `<span class="pill ${c}">${p<0.0001&&p>0?f(ppm,0)+' ppm':f(p*100,2)+' %'}</span>`;}
 function renderMC(){
-  const p=S.p,sP=stats(MC.P),sE=stats(MC.E),sS=stats(MC.eS),sB=stats(MC.eB),sL=stats(MC.Ls),sW=stats(MC.Ws);
+  const p=MC.p,sP=stats(MC.P),sE=stats(MC.E),sS=stats(MC.eS),sB=stats(MC.eB),sL=stats(MC.Ls),sW=stats(MC.Ws);
   const cpkL=(st,mn)=>(st.mean-mn)/(3*st.sd),cpkU=(st,mx)=>(mx-st.mean)/(3*st.sd);
   const bins={};for(const x of MC.P){const b=Math.floor(x/p.bin)*p.bin;bins[b]=(bins[b]||0)+1;}
   const binRows=Object.keys(bins).map(Number).sort((a,b)=>b-a).map(b=>`<tr><td>${f(b,p.bin%1?1:0)} W</td><td class="n">${f(bins[b]/MC.n*100,2)} %</td><td><span class="share" style="width:${bins[b]/MC.n*160}px"></span></td></tr>`).join('');
   const pr=MC.prob;
   const pr_=(l,v,extra='')=>`<tr><td>${l}</td><td class="n">${pill(v)}</td><td class="n">${extra}</td></tr>`;
+  $('#mcState').textContent=`${f(MC.n,0)} iterasyon · ${f(MC.ms,0)} ms · girdiler değiştikçe yenilenir`;
   $('#mcOut').innerHTML=`
-  ${MCstale?'<p class="chip warn" style="align-self:flex-start">Girdiler değişti, sonuçlar eski. Yeniden çalıştırın.</p>':''}
+  <div class="recbox"><div><i>Önerilen etiket gücü</i><b>${f(MC.plateRec,0)} W</b><small>Modüllerin ≥ %97,7’si bu değerin üstünde (P<sub>2,3</sub> = ${f(sP.sorted[Math.floor(0.0228*(MC.n-1))],1)} W, ${f(p.bin,0)} W adım)</small></div>
+    ${MC.plateRec!==p.Pplate?`<button class="btn sm pri" id="plateApply">Etiketi ${f(MC.plateRec,0)} W yap</button>`:'<span class="chip good">● etiket gücü önerilenle aynı</span>'}</div>
   <div class="stats">
     <div class="stat hl"><i>Pmax ort. ± σ</i><b>${f(sP.mean,1)} ± ${f(sP.sd,2)} W</b></div>
     <div class="stat"><i>Pmax P5 / P95</i><b>${f(sP.p5,1)} / ${f(sP.p95,1)}</b></div>
     <div class="stat hl"><i>Verim ort. ± σ</i><b>${f(sE.mean,2)} ± ${f(sE.sd,3)} %</b></div>
     <div class="stat"><i>Etiket altı (&lt; ${f(p.Pplate,0)} W)</i><b>${f(pr.Pplate*100,2)} %</b></div>
-    <div class="stat"><i>Boyut ihlali (herhangi)</i><b>${f(pr.dimAny*100,2)} %</b></div>
+    <div class="stat"><i>Ölçü veya kenar ihlali</i><b>${f(pr.dimAny*100,2)} %</b></div>
     <div class="stat"><i>Süre</i><b>${f(MC.n,0)} it. · ${f(MC.ms,0)} ms</b></div>
   </div>
   <div class="grid2">
@@ -406,7 +420,7 @@ function renderCompare(){
   $('#cmpDiff').innerHTML=rows.length?`<table><tr><th>Girdi</th>${E.map((e,i)=>`<th>${i===0?'◉ ':''}${esc(e.d.name)}</th>`).join('')}</tr>${rows.map(k=>`<tr><td>${esc(SCH[k].l)}</td>${E.map(e=>`<td>${esc(fmtV(k,e.p[k]))}</td>`).join('')}</tr>`).join('')}</table>`:'<p class="note">Seçili tasarımların girdileri aynı.</p>';
 }
 $('#savedList').addEventListener('click',e=>{const t=e.target;
-  if(t.dataset.cload){const d=SAVED.find(x=>x.id===t.dataset.cload);if(d){const b=defaults();S={name:d.name,p:Object.assign(b.p,JSON.parse(JSON.stringify(d.p))),t:Object.assign(b.t,d.t||{}),tpl:''};MC=null;$('#mcOut').innerHTML='<p class="note">Henüz çalıştırılmadı.</p>';syncInputs();recompute();go('tasarim');}}
+  if(t.dataset.cload){const d=SAVED.find(x=>x.id===t.dataset.cload);if(d){const b=defaults();S={name:d.name,p:Object.assign(b.p,JSON.parse(JSON.stringify(d.p))),t:Object.assign(b.t,d.t||{}),tpl:''};MC=null;mcKey='';syncInputs();recompute();go('tasarim');}}
   if(t.dataset.cdel){SAVED=SAVED.filter(x=>x.id!==t.dataset.cdel);CMP.sel=CMP.sel.filter(x=>x!==t.dataset.cdel);if(CMP.ref===t.dataset.cdel)CMP.ref=SAVED[0]?SAVED[0].id:'';saveLS();renderCompare();}});
 $('#savedList').addEventListener('change',e=>{const t=e.target;
   if(t.dataset.csel){if(t.checked){if(!CMP.sel.includes(t.dataset.csel))CMP.sel.push(t.dataset.csel);}else CMP.sel=CMP.sel.filter(x=>x!==t.dataset.csel);saveLS();renderCompare();}
@@ -417,7 +431,7 @@ const designJSON=()=>({schema:'pv-modul-tasarim',version:1,name:S.name,saved:new
 function loadDesign(o){
   if(!o||o.schema!=='pv-modul-tasarim'||!o.params)throw new Error('Bu dosya bir PV modül tasarımı değil (schema alanı eksik).');
   const b=defaults();S={name:o.name||'Yüklenen tasarım',p:Object.assign(b.p,o.params),t:Object.assign(b.t,o.tolerances||{}),tpl:''};
-  MC=null;$('#mcOut').innerHTML='<p class="note">Henüz çalıştırılmadı.</p>';syncInputs();recompute();
+  MC=null;mcKey='';syncInputs();recompute();
 }
 const TRMAP={ç:'c',ğ:'g',ı:'i',ö:'o',ş:'s',ü:'u',Ç:'C',Ğ:'G',İ:'I',Ö:'O',Ş:'S',Ü:'U'};
 const safeName=()=>(S.name||'tasarim').replace(/[çğıöşüÇĞİÖŞÜ]/g,c=>TRMAP[c]).replace(/[^\w\-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,60)||'tasarim';
@@ -456,11 +470,11 @@ $('#jsonCopy').onclick=()=>{const t=$('#jsonBox');if(!t.value)t.value=JSON.strin
 $('#jsonLoad').onclick=()=>{const m=$('#jsonMsg');try{loadDesign(JSON.parse($('#jsonBox').value));m.className='msg ok';m.textContent='Tasarım yüklendi.';}catch(e){m.className='msg er';m.textContent='JSON okunamadı: '+e.message;}};
 let resetArm=false;
 $('#resetBtn').onclick=()=>{const b=$('#resetBtn');if(!resetArm){resetArm=true;b.textContent='Emin misiniz? Tekrar dokunun';setTimeout(()=>{resetArm=false;b.textContent='Varsayılana dön';},3500);return;}
-  resetArm=false;b.textContent='Varsayılana dön';S=fromTemplate(TEMPLATES[0].id);MC=null;$('#mcOut').innerHTML='<p class="note">Henüz çalıştırılmadı.</p>';syncInputs();recompute();};
+  resetArm=false;b.textContent='Varsayılana dön';S=fromTemplate(TEMPLATES[0].id);MC=null;mcKey='';syncInputs();recompute();};
 
 /* ---- Sekmeler ---- */
 const TABS=['tasarim','cizim','ctm','tolerans','maliyet','kutuphane','karsilastir','kayit'];
-function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
+function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;if(t==='tolerans')mcAuto();if(t==='cizim'&&window.renderSheets)renderSheets();try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)go(b.dataset.tab);});
 
 /* ---- Başlat ---- */
@@ -473,3 +487,5 @@ buildInputs();syncInputs();recompute();go((location.hash||'').slice(1));
   if(DL){for(const b of $$('.dl'))b.hidden=false;note.textContent='';}
   else{note.className='msg';note.textContent='Bu görünümde dosya indirme kullanılamıyor. JSON’u aşağıdan kopyalayabilirsiniz.';}
 })();
+
+document.addEventListener('click',e=>{if(e.target.id==='plateApply'&&MC){S.p.Pplate=MC.plateRec;syncInputs();schedule();}});

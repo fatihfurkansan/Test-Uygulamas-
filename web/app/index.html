@@ -60,15 +60,18 @@
 
   <!-- ÇİZİM -->
   <section class="panel" data-panel="cizim" hidden>
-    <div class="card draw">
-      <div class="cardhead"><h3>Teknik çizim · üstten görünüm</h3><small>Ölçüler mm · arka taraftaki parçalar kesikli</small></div>
-      <div class="legend" style="margin-bottom:8px">
-        <span style="--sw:var(--cell)">Hücre</span><span style="--sw:var(--cellwire)">Bağlantı teli</span><span style="--sw:var(--bus)">Bus ribbon</span><span style="--sw:var(--glass)">Cam</span><span style="--sw:var(--frame)">Çerçeve</span><span style="--sw:var(--bad)">Sınır ihlali</span>
+    <div class="card">
+      <div class="cardhead"><h3>Teknik resim</h3><small>A3 yatay · ISO E projeksiyon · ölçüler mm</small></div>
+      <div class="sheetbar" id="sheetBar">
+        <div class="seg"><button class="btn sm" data-sheet="1" aria-pressed="true">Pafta 1 · Görünüşler</button><button class="btn sm" data-sheet="2" aria-pressed="false">Pafta 2 · Detay ve elektrik</button></div>
+        <div class="seg"><button class="btn sm" data-zoom="out" aria-label="Uzaklaştır">−</button><span id="zoomLbl" class="mono">100%</span><button class="btn sm" data-zoom="in" aria-label="Yakınlaştır">+</button><button class="btn sm" data-zoom="fit">Sığdır</button></div>
+        <div class="seg"><button class="btn sm" id="svgDl">SVG indir</button><button class="btn sm pri" id="printBtn">Yazdır / PDF</button></div>
       </div>
-      <div id="drawMain"></div>
+      <div class="sheetwrap" id="sheetBox"></div>
+      <p class="note">Telefonda yakınlaştırmak için + düğmesini veya iki parmakla büyütmeyi kullanın. Yazdır / PDF iki paftayı A3 yatay olarak çıkarır; tarayıcıda "PDF olarak kaydet" seçin. Kırmızı ölçüler sınır ihlalidir.</p>
     </div>
-    <div class="card"><h3>Detaylar</h3><div class="details" id="drawDetails"></div></div>
     <div class="card"><h3>Sınır kontrolleri</h3><div class="viol" id="violBox2"></div></div>
+    <div id="inputsMech" class="panel"></div>
   </section>
 
   <!-- CTM -->
@@ -97,9 +100,9 @@
   <section class="panel" data-panel="tolerans" hidden>
     <div id="inputsMC" class="panel"></div>
     <div class="card">
-      <div class="cardhead"><h3>Monte Carlo tolerans analizi</h3><button class="btn pri" id="mcRun">Simülasyonu çalıştır</button></div>
-      <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Kenar mesafesi, cam ölçüsü, hücre bloğu uzunluğu ve lay-up kaçıklığından türetilir.</p>
-      <div id="mcOut" class="panel" style="margin-top:10px"><p class="note">Henüz çalıştırılmadı.</p></div>
+      <div class="cardhead"><h3>Monte Carlo tolerans analizi</h3><div class="btns"><small id="mcState" class="note"></small><button class="btn sm" id="mcRun">Yeniden çalıştır</button></div></div>
+      <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Dizi boyu stringer adım hatasından, dizilerin yanal konumu lay-up hatasından gelir; kenar mesafesini kenar sütundaki en geniş hücre belirler. Cam kesim, lay-up kaçıklığı ve çerçeve montajı ayrı bileşenlerdir. Elektriksel saçılım: hücre gücü, proses CTM ve flasher belirsizliği.</p>
+      <div id="mcOut" class="panel" style="margin-top:10px"><p class="note">Hesaplanıyor…</p></div>
     </div>
   </section>
 
@@ -187,6 +190,8 @@
 <script src="../assets/js/engine.js"></script>
 <script src="../assets/js/app.js"></script>
 <script src="../assets/js/libview.js"></script>
+<script src="../assets/js/drawing.js"></script>
 <script src="../assets/js/pwa.js"></script>
+<div id="printBox" class="printbox" aria-hidden="true"></div>
 </body>
 </html>

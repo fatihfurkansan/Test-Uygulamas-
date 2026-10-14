@@ -208,3 +208,25 @@ dialog#libDlg .row.wide{grid-template-columns:1fr minmax(0,12rem)}
 dialog#libDlg .row input[type=text]{width:100%;text-align:right}
 @media (max-width:520px){dialog#libDlg{padding:14px}dialog#libDlg .row.wide{grid-template-columns:1fr}}
 .updbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;gap:10px;align-items:center;justify-content:center;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--raised);border-top:1px solid var(--line);font-size:13.5px}
+.recbox{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;border:1px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:10px 12px}
+.recbox i{display:block;font-style:normal;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.recbox b{font-family:var(--f-mono);font-weight:500;font-size:18px;margin-right:8px}
+.recbox small{color:var(--muted);font-size:12px}
+input.txt{text-align:left;font-family:var(--f-body)}
+
+/* ---- Teknik resim ---- */
+.sheetbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.seg{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.seg .btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#zoomLbl{min-width:3.5em;text-align:center;font-size:12.5px}
+.sheetwrap{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:4px;background:#8a929c;padding:8px;max-height:78vh}
+.sheetwrap svg{display:block;width:100%;height:auto;box-shadow:0 1px 6px rgba(0,0,0,.25)}
+.printbox{display:none}
+@media print{
+  @page{size:A3 landscape;margin:0}
+  body>*:not(.printbox){display:none!important}
+  .printbox{display:block!important}
+  .printpage{width:420mm;height:297mm;page-break-after:always;break-after:page}
+  .printpage svg{width:420mm;height:297mm;display:block}
+  html,body{background:#fff!important;padding:0!important}
+}

@@ -15,7 +15,7 @@ const SCHEMA=[
   S_('Isc','cell','Hücre Isc','A',16.30,{min:0.1}),
   S_('Imp','cell','Hücre Imp','A',15.79,{min:0.1}),
   S_('mc','cell','Hücre kütlesi','g',12.0,{min:0}),
-  S_('sP','cell','Lot güç saçılımı σ','%',0.30,{min:0,hint:'Monte Carlo'}),
+  S_('sP','cell','Modül ort. hücre gücü saçılımı σ','%',0.30,{min:0,hint:'Bin içi + lotlar arası, Monte Carlo'}),
   S_('cvI','cell','Bin içi Isc değişkenliği (CV)','%',1.5,{min:0}),
   S_('tc','ds','Pmax sıcaklık katsayısı γ','%/°C',-0.30,{hint:'Teknoloji seçimiyle dolar'}),
   S_('bVoc','ds','Voc sıcaklık katsayısı β','%/°C',-0.25),
@@ -31,8 +31,8 @@ const SCHEMA=[
   S_('half','lay','Half-cut (yarım hücre)','',true,{type:'bool'}),
   S_('nc','lay','String (sütun) sayısı','adet',6,{int:1,min:1,max:40}),
   S_('nr','lay','Sütun başına hücre parçası','adet',22,{int:1,min:1,max:200,hint:'Half-cut: üst + alt toplam'}),
-  S_('gc','lay','Hücre arası boşluk','mm',1.0,{tol:0.3,min:-1}),
-  S_('gs','lay','String aralığı','mm',2.5,{tol:0.5,min:0}),
+  S_('gc','lay','Hücre arası boşluk','mm',1.0,{tol:0.3,min:-1,hint:'Tol.: stringer adım hatası'}),
+  S_('gs','lay','String aralığı','mm',2.5,{tol:0.5,min:0,hint:'Tol.: lay-up konumlama'}),
   S_('gm','lay','Orta boşluk (half-cut)','mm',6.0,{tol:0.5,min:0}),
   S_('eL','lay','Üst/alt kenar mesafesi','mm',20.0,{min:0,hint:'Cam kenarı → hücre'}),
   S_('eW','lay','Yan kenar mesafesi','mm',11.15,{min:0,hint:'Cam kenarı → hücre'}),
@@ -83,6 +83,27 @@ const SCHEMA=[
   S_('potG','fr','Potting silikonu (kutu başı)','g',20,{min:0}),
   S_('jbAdhG','fr','J-box yapıştırma silikonu','g',15,{min:0}),
   S_('jbm','fr','J-box takımı kütlesi','kg',0.30,{min:0}),
+  // Mekanik ve çizim
+  S_('fH','mech','Çerçeve yüksekliği','mm',30,{min:0,hint:'Çerçeve seçimiyle dolar'}),
+  S_('fOv','mech','Çerçeve dudağının cama binmesi','mm',4,{min:0,hint:'Hücreye kadar uzanırsa gölge ihlali'}),
+  S_('fFl','mech','Çerçeve alt flanş genişliği','mm',20,{min:0}),
+  S_('fWt','mech','Çerçeve et kalınlığı','mm',1.6,{min:0.5}),
+  S_('mh1','mech','Montaj deliği aralığı 1','mm',1400,{min:0,hint:'Uzun kenar, merkeze simetrik'}),
+  S_('mh2','mech','Montaj deliği aralığı 2','mm',400,{min:0,hint:'0 = yok'}),
+  S_('mhW','mech','Montaj deliği (oval) genişlik','mm',9,{min:0}),
+  S_('mhL','mech','Montaj deliği (oval) boy','mm',14,{min:0}),
+  S_('gh','mech','Topraklama deliği çapı','mm',4.2,{min:0}),
+  S_('jbW','mech','J-box genişliği','mm',60,{min:0}),
+  S_('jbL','mech','J-box boyu','mm',40,{min:0}),
+  S_('jbU','mech','J-box konumu (modül ucundan)','mm',0,{min:0,hint:'0 = otomatik: half-cut ortada, tam hücre üst uçta'}),
+  S_('lblW','mech','Arka etiket boyutu (genişlik)','mm',140,{min:0}),
+  S_('lblH','mech','Arka etiket boyutu (yükseklik)','mm',90,{min:0}),
+  S_('Vsys','mech','Maks. sistem gerilimi','V DC',1500,{min:0}),
+  S_('company','mech','Firma','','',{type:'text'}),
+  S_('dwgNo','mech','Çizim numarası','','PVM-001',{type:'text'}),
+  S_('rev','mech','Revizyon','','A',{type:'text'}),
+  S_('drawer','mech','Çizen','','',{type:'text'}),
+  S_('checker','mech','Kontrol / onay','','',{type:'text'}),
   // Sınırlar
   S_('eMin','lim','Min. kenar mesafesi (gerilimli parça)','mm',10,{min:0}),
   S_('gcMin','lim','Min. hücre arası boşluk','mm',0.5),
@@ -129,7 +150,7 @@ const SCHEMA=[
   S_('nPal','cost','Palet başı modül','adet',36,{int:1,min:1}),
   S_('yield','cost','Üretim verimi (yield)','%',99.0,{min:50,max:100,hint:'Hurda/düşük sınıf karşılığı maliyete eklenir'})
 ];
-const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',ds:'Datasheet ve saha',cost:'Maliyet ayarları'};
+const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',mech:'Mekanik ve teknik resim',ds:'Datasheet ve saha',cost:'Maliyet ayarları'};
 const SCH=Object.fromEntries(SCHEMA.map(s=>[s.k,s]));
 
 /* ---- BOM satır tanımları: fiyat birimi, varsayılan fiyat ve fire ---- */
@@ -164,6 +185,7 @@ function applyLib(p,key,id){
   if(priceKey)for(const pk of [].concat(priceKey))delete p['pr_'+pk];
   if(key==='fmtV'||key==='techV')cellFrom(p);
   if(key==='encFV')p.Tf=it.T;
+  if(key==='frameV'&&it.h!==undefined)p.fH=it.h;
   if(key==='rearV'||key==='encRV')p.Rb=rearRb(p);
 }
 function rearRb(p){const e=LIB.enc.items[p.encRV];if(e&&e.rb!==undefined)return e.rb;const r=LIB.rear.items[p.rearV];return r?r.Rb:0.08;}
@@ -267,6 +289,7 @@ function evaluate(p,light){
   if(W>p.Wmax)V.push({id:'W',m:`Modül genişliği ${f(W,1)} mm > maks. ${f(p.Wmax,1)} mm`});
   if(half&&nr%2)V.push({id:'nr',m:'Half-cut dizilimde sütun başına parça sayısı çift olmalı'});
   if(lOn<=0)V.push({id:'ov',m:'Tel uç boşluğu hücre boyunun yarısından büyük'});
+  if(p.frameV!=='none'&&p.fOv>=Math.min(p.eW,p.eL))V.push({id:'fOv',m:`Çerçeve dudağı (${f(p.fOv,1)} mm) hücreye kadar uzanıyor; kenar mesafesinden küçük olmalı`});
   if(p.frameV==='none'&&rear.kind==='bs')V.push({id:'fr',m:'Backsheet’li modül çerçevesiz olamaz'});
   if((LIB.enc.items[p.encFV]||{}).white)V.push({id:'enc',m:'Beyaz enkapsülan ön yüzde kullanılamaz'});
   R.viol=V;R.bad=new Set(V.map(v=>v.id));
@@ -330,41 +353,54 @@ function bom(p,R){
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
 function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
 const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+/* Monte Carlo — üretim gerçekçi ölçü modeli:
+   • Dizi (string) boyu stringer adımıyla belirlenir: her hücre adımı bağımsız ±tol(g) hatası taşır,
+     hücre boyu değişimi dizi boyunu değil boşluğu etkiler.
+   • Dizilerin yanal konumu lay-up robotuyla belirlenir: kenar dizilerin konum hatası σ_gs/√2.
+   • Kenar mesafesini kenar sütundaki en geniş hücre belirler (her parça için bağımsız genişlik sapması).
+   • Cam kesim, lay-up kaçıklığı ve çerçeve montajı ayrı bileşenlerdir. */
 function runMC(p,tol){
   const n=Math.round(p.n),rng=mulberry32(Math.round(p.seed)||1);
   let spare=null;const gauss=()=>{if(spare!==null){const s=spare;spare=null;return s;}let u=0,v=0;while(u===0)u=rng();v=rng();const r=Math.sqrt(-2*Math.log(u));spare=r*Math.sin(2*Math.PI*v);return r*Math.cos(2*Math.PI*v);};
   const uni=p.dist==='uniform';
   const T=k=>tol[k]||0;
-  const draw=(mu,t)=>t>0?(uni?mu+(rng()*2-1)*t:mu+gauss()*t/3):mu;
-  const sd=t=>uni?t/Math.sqrt(3):t/3;
-  const drawSum=(mu,t,k)=>k<=0?0:(t>0?(k===1?draw(mu,t):mu*k+gauss()*sd(t)*Math.sqrt(k)):mu*k);
+  const sdT=t=>t>0?(uni?t/Math.sqrt(3):t/3):0;
+  const dev=t=>t>0?(uni?(rng()*2-1)*t:gauss()*t/3):0;
   const R0=evaluate(p,true);
   const nc=R0.nc,nr=R0.nr,ng=R0.nGapCol;
   const P=new Float64Array(n),E=new Float64Array(n),Ls=new Float64Array(n),Ws=new Float64Array(n),eS=new Float64Array(n),eB=new Float64Array(n);
   let vE=0,vB=0,vL=0,vW=0,vP=0,vAny=0;
   const q=Object.assign({},p);
+  const sx=sdT(T('gs'))/Math.SQRT2;
+  const maxDev=(t,k)=>{let m=-1e9;for(let j=0;j<k;j++){const d=dev(t);if(d>m)m=d;}return m;};
   for(let i=0;i<n;i++){
-    q.a=draw(p.a,T('a'));q.b=draw(p.b,T('b'));
-    const h=R0.half?q.b/2:q.b;
-    const sGc=drawSum(p.gc,T('gc'),ng),sGs=drawSum(p.gs,T('gs'),nc-1),gm=R0.gmUse?draw(p.gm,T('gm')):0;
-    const blockL=nr*h+sGc+gm,blockW=nc*q.a+sGs;
-    const Lg=draw(R0.Lg,p.gT),Wg=draw(R0.Wg,p.gT);
-    const oy=draw(0,T('pl')),ox=draw(0,T('pl'));
-    const eL=(Lg-blockL)/2,eW=(Wg-blockW)/2;
-    q.gc=ng?sGc/ng:p.gc;q.gs=nc>1?sGs/(nc-1):p.gs;q.gm=R0.gmUse?gm:p.gm;q.eL=eL;q.eW=eW;
-    q.tgf=draw(p.tgf,T('tgf'));q.tgr=draw(p.tgr,T('tgr'));q.dw=draw(p.dw,T('dw'));
+    const sGc=ng>0?ng*p.gc+gauss()*sdT(T('gc'))*Math.sqrt(ng):0;
+    const gm=R0.gmUse?p.gm+dev(T('gm')):0;
+    const blockL=nr*R0.h+sGc+gm;
+    const Lg=R0.Lg+dev(p.gT),Wg=R0.Wg+dev(p.gT);
+    const oy=dev(T('pl')),ox=dev(T('pl'));
+    const eL=(Lg-blockL)/2,eW0=(Wg-R0.blockW)/2;
+    const eLeft=eW0+ox+gauss()*sx-maxDev(T('a'),nr)/2;
+    const eRight=eW0-ox-gauss()*sx-maxDev(T('a'),nr)/2;
+    q.gc=ng?sGc/ng:p.gc;q.gm=R0.gmUse?gm:p.gm;q.eL=eL;q.eW=eW0;
+    q.tgf=p.tgf+dev(T('tgf'));q.tgr=p.tgr+dev(T('tgr'));q.dw=p.dw+dev(T('dw'));
     const r=evaluate(q,true);
-    const Lm=r.L+draw(0,p.fT),Wm=r.W+draw(0,p.fT);
+    const Lm=r.L+dev(p.fT),Wm=r.W+dev(p.fT);
     const Pi=r.P*(1+gauss()*p.sP/100)*(1+gauss()*p.sCTM/100)*(1+gauss()*p.sMeas/100);
-    const es=Math.min(eW+ox,eW-ox),eb=Math.min(eL+oy,eL-oy)-p.bg-p.bw;
+    const es=Math.min(eLeft,eRight),eb=Math.min(eL+oy,eL-oy)-p.bg-p.bw;
     P[i]=Pi;E[i]=Pi/(Lm*Wm/1e6*10);Ls[i]=Lm;Ws[i]=Wm;eS[i]=es;eB[i]=eb;
     const a1=es<p.eMin,a2=eb<p.eMin,a3=Lm>p.Lmax,a4=Wm>p.Wmax,a5=Pi<p.Pplate;
     vE+=a1;vB+=a2;vL+=a3;vW+=a4;vP+=a5;vAny+=(a1||a2||a3||a4);
   }
-  const pg=(mu,t,mn,count)=>{if(count<=0)return 0;if(!(t>0))return mu<mn?1:0;const ps=uni?Math.min(Math.max((mn-(mu-t))/(2*t),0),1):Phi((mn-mu)/(t/3));return 1-Math.pow(1-ps,count);};
-  return {n,P,E,Ls,Ws,eS,eB,
+  // boşluk ihlali: her boşluk = adım hatası − komşu hücre boyutu sapmalarının ortalaması
+  const hTol=R0.half?T('b'):T('b');
+  const pg=(mu,sd,mn,count)=>{if(count<=0)return 0;if(!(sd>0))return mu<mn?1:0;const ps=Phi((mn-mu)/sd);return 1-Math.pow(1-ps,count);};
+  const sdGc=Math.sqrt(sdT(T('gc'))**2+sdT(hTol)**2/2), sdGs=Math.sqrt(sdT(T('gs'))**2+sdT(T('a'))**2/2), sdGm=Math.sqrt(sdT(T('gm'))**2+sdT(hTol)**2/2);
+  const st=stats(P);const lo=st.sorted[Math.floor(0.0228*(n-1))];
+  return {n,P,E,Ls,Ws,eS,eB,p:JSON.parse(JSON.stringify(p)),
+    plateRec:Math.floor(lo/p.bin)*p.bin,
     prob:{eSide:vE/n,eBus:vB/n,L:vL/n,W:vW/n,Pplate:vP/n,dimAny:vAny/n,
-      gc:pg(p.gc,T('gc'),p.gcMin,ng*nc),gs:pg(p.gs,T('gs'),p.gsMin,nc-1),gm:R0.gmUse?pg(p.gm,T('gm'),p.gmMin,1):0},
+      gc:pg(p.gc,sdGc,p.gcMin,ng*nc),gs:pg(p.gs,sdGs,p.gsMin,(nc-1)*nr),gm:R0.gmUse?pg(p.gm,sdGm,p.gmMin,nc):0},
     nom:R0};
 }
 function stats(arr){const s=Float64Array.from(arr).sort();const n=s.length;let m=0;for(const x of s)m+=x;m/=n;let v=0;for(const x of s)v+=(x-m)*(x-m);const sd=Math.sqrt(v/(n-1));const q=pp=>s[Math.min(n-1,Math.max(0,Math.round(pp*(n-1))))];return {mean:m,sd,min:s[0],max:s[n-1],p5:q(.05),p50:q(.5),p95:q(.95),sorted:s};}
