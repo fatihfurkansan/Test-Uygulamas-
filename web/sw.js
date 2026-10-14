@@ -1,5 +1,5 @@
 /* PV Modül Tasarım service worker: çevrimdışı çalışma */
-const VERSION='pvm-v2';
+const VERSION='pvm-v3';
 const CORE=['/','/app/','/manifest.webmanifest','/assets/css/app.css','/assets/css/site.css',
   '/assets/js/library.js','/assets/js/engine.js','/assets/js/app.js','/assets/js/libview.js','/assets/js/pwa.js','/assets/js/drawing.js','/assets/js/site.js',
   '/assets/vendor/xlsx.full.min.js','/assets/icons/icon.svg','/assets/icons/icon-192.png','/assets/icons/icon-512.png','/assets/icons/apple-touch-icon.png'];

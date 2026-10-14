@@ -51,7 +51,15 @@
             <select id="tplSel"></select>
           </div>
         </div>
-        <div class="card"><h3>Sonuç özeti</h3><div class="stats" id="sumStats"></div><div class="viol" id="violBox" style="margin-top:12px"></div></div>
+        <div class="card"><h3>Sonuç özeti</h3><div class="stats" id="sumStats"></div>
+          <div class="mini" id="ctmMini"></div>
+          <div class="calq">
+            <label for="measP">Ölçülen modül Pmax <small>Flasher ortalaması; aynı hücre bini için</small></label>
+            <div class="val"><input type="text" inputmode="decimal" id="measP" placeholder="ör. 632,5"><span class="u">W</span></div>
+            <button class="btn sm pri" id="measApply">Modeli kalibre et</button>
+          </div>
+          <p class="msg" id="measOut"></p>
+          <div class="viol" id="violBox" style="margin-top:12px"></div></div>
         <div id="inputsDesign" class="panel"></div>
       </div>
       <div class="side-draw card draw"><div class="cardhead"><h3>Üstten görünüm</h3><small>Ölçek gerçek · mm</small></div><div id="drawSide"></div></div>
@@ -101,7 +109,7 @@
     <div id="inputsMC" class="panel"></div>
     <div class="card">
       <div class="cardhead"><h3>Monte Carlo tolerans analizi</h3><div class="btns"><small id="mcState" class="note"></small><button class="btn sm" id="mcRun">Yeniden çalıştır</button></div></div>
-      <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Dizi boyu stringer adım hatasından, dizilerin yanal konumu lay-up hatasından gelir; kenar mesafesini kenar sütundaki en geniş hücre belirler. Cam kesim, lay-up kaçıklığı ve çerçeve montajı ayrı bileşenlerdir. Elektriksel saçılım: hücre gücü, proses CTM ve flasher belirsizliği.</p>
+      <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Dizi boyu stringer adım hatasından, dizilerin yanal konumu lay-up hatasından gelir; kenar mesafesini kenar sütundaki en geniş hücre belirler. Cam kesim, lay-up kaçıklığı ve çerçeve montajı ayrı bileşenlerdir. Elektriksel saçılım: proses CTM ve flasher (ölçüm) belirsizliği.</p>
       <div id="mcOut" class="panel" style="margin-top:10px"><p class="note">Hesaplanıyor…</p></div>
     </div>
   </section>

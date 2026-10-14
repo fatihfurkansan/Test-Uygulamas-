@@ -9,14 +9,14 @@ const SCHEMA=[
   S_('a','cell','Hücre genişliği','mm',182.2,{tol:0.2,min:50}),
   S_('b','cell','Hücre boyu','mm',210,{tol:0.2,min:50}),
   S_('ch','cell','Köşe pahı (kenar)','mm',0,{min:0,hint:'Tam kare için 0'}),
-  S_('eta','cell','Hücre verimi','%',26.0,{min:1,max:40,hint:'Pmax ile bağlı'}),
-  S_('P','cell','Hücre Pmax (tam hücre)','W',9.95,{min:0.1}),
-  S_('Voc','cell','Hücre Voc','V',0.728,{min:0.1}),
-  S_('Isc','cell','Hücre Isc','A',16.30,{min:0.1}),
-  S_('Imp','cell','Hücre Imp','A',15.79,{min:0.1}),
+  S_('Voc','cell','Hücre Voc','V',0.728,{min:0.1,hint:'Tam hücre, STC'}),
+  S_('Isc','cell','Hücre Isc','A',16.07,{min:0.1}),
+  S_('Vmp','cell','Hücre Vmpp','V',0.6503,{min:0.05}),
+  S_('Imp','cell','Hücre Impp','A',15.30,{min:0.1}),
+  S_('P','cell','Hücre Pmax = Vmpp × Impp','W',9.95,{type:'calc',d:3}),
+  S_('eta','cell','Hücre verimi','%',26.0,{type:'calc',d:2,hint:'Pmax / (alan × 1000 W/m²)'}),
+  S_('FF','cell','Dolum faktörü FF','%',85.0,{type:'calc',d:2,hint:'Vmpp·Impp / (Voc·Isc)'}),
   S_('mc','cell','Hücre kütlesi','g',12.0,{min:0}),
-  S_('sP','cell','Modül ort. hücre gücü saçılımı σ','%',0.30,{min:0,hint:'Bin içi + lotlar arası, Monte Carlo'}),
-  S_('cvI','cell','Bin içi Isc değişkenliği (CV)','%',1.5,{min:0}),
   S_('tc','ds','Pmax sıcaklık katsayısı γ','%/°C',-0.30,{hint:'Teknoloji seçimiyle dolar'}),
   S_('bVoc','ds','Voc sıcaklık katsayısı β','%/°C',-0.25),
   S_('aIsc','ds','Isc sıcaklık katsayısı α','%/°C',0.046),
@@ -128,9 +128,10 @@ const SCHEMA=[
   S_('Tm','ctm','Ölçüm sıcaklığı','°C',25),
   S_('Rj','ctm','J-box terminal + diyot yolu direnci','mΩ',1.0,{min:0}),
   S_('conR','ctm','Konnektör çifti direnci','mΩ',0.5,{min:0}),
-  S_('mmMode','ctm','Mismatch’i Isc CV’den hesapla','',false,{type:'bool',hint:'δ = β·CV²'}),
-  S_('dMM','ctm','Mismatch kaybı','%',0.30,{min:0}),
-  S_('beta','ctm','Mismatch katsayısı β','–',0.13,{min:0}),
+  S_('mmMode','ctm','Mismatch’i hücre akım saçılımından hesapla','',false,{type:'bool',hint:'Kapalıysa aşağıdaki sabit mismatch kaybı kullanılır'}),
+  S_('dMM','ctm','Mismatch kaybı (sabit)','%',0.30,{min:0,hint:'Yalnız yukarıdaki seçenek kapalıyken kullanılır'}),
+  S_('cvI','ctm','Hücre bini içi Impp saçılımı (CV = σ/ort.)','%',1.5,{min:0,hint:'Yalnız seçenek açıkken: δ = β·CV²'}),
+  S_('beta','ctm','Mismatch katsayısı β','–',0.13,{min:0,hint:'Yalnız seçenek açıkken; ölçümle kalibre edin'}),
   S_('kCal','ctm','Kalibrasyon çarpanı k_kal','–',1.000,{min:0.5,max:1.5}),
   // Monte Carlo
   S_('n','mc','İterasyon sayısı','adet',10000,{int:1,min:100,max:200000}),
@@ -189,7 +190,6 @@ function applyLib(p,key,id){
   if(key==='rearV'||key==='encRV')p.Rb=rearRb(p);
 }
 function rearRb(p){const e=LIB.enc.items[p.encRV];if(e&&e.rb!==undefined)return e.rb;const r=LIB.rear.items[p.rearV];return r?r.Rb:0.08;}
-function cellAreaCm2(p){return (p.a*p.b-4*(p.ch>0?p.ch*p.ch/2:0))/100;}
 
 /* ---- Ana hesap: geometri, CTM, elektrik, ağırlık, BOM ---- */
 function evaluate(p,light){
@@ -209,7 +209,8 @@ function evaluate(p,light){
   const Apiece=a*h-(half?2:4)*chA;
   const Acells=N*Apiece,Amod=L*W,Aglass=Lg*Wg;
   // elektrik
-  const Pp=half?p.P/2:p.P,Ip=half?p.Imp/2:p.Imp,Iscp=half?p.Isc/2:p.Isc;
+  const Pc=p.Vmp>0&&p.Imp>0?p.Vmp*p.Imp:p.P;
+  const Pp=half?Pc/2:Pc,Ip=half?p.Imp/2:p.Imp,Iscp=half?p.Isc/2:p.Isc;
   const Pcells=N*Pp;
   const steps=[];const add=(id,l,k,kind,note)=>steps.push({id,l,k,kind,note});
   add('cut','Kesme (half-cut) kaybı',half?1-p.dCut/100:1,'loss','δ_kes');
@@ -251,7 +252,7 @@ function evaluate(p,light){
   let P=Pcells;for(const s of steps){s.P0=P;P*=s.k;s.P1=P;s.dW=s.P1-s.P0;s.dPct=(s.k-1)*100;}
   const Voc=Ns*p.Voc,Isc=Np*Iscp*kI,Imp=Imod,Vmp=P/Imp,FF=P/(Voc*Isc);
   const eta=P/(Amod/1e6*10),etaG=P/(Aglass/1e6*10);
-  const R={half,Np,Ns,N,Nfull,nc,nr,up,lo,h,nGapCol,gmUse,blockL,blockW,Lg,Wg,L,W,fc,Apiece,Acells,Amod,Aglass,
+  const R={Pc,half,Np,Ns,N,Nfull,nc,nr,up,lo,h,nGapCol,gmUse,blockL,blockW,Lg,Wg,L,W,fc,Apiece,Acells,Amod,Aglass,
     AAR:Acells/Amod*100,Pcells,steps,P,CTM:P/Pcells*100,eta,etaG,Voc,Isc,Imp,Vmp,FF,kI,Agap,Pw,Pbus,Pj,Rw,Rbus,Rjt,Rcab,Iw,Ipe,Imod,lOn,Aw,Ab,dmm};
   if(light)return R;
   // datasheet: sıcaklık, bifasiyal, garanti
@@ -288,6 +289,9 @@ function evaluate(p,light){
   if(L>p.Lmax)V.push({id:'L',m:`Modül boyu ${f(L,1)} mm > maks. ${f(p.Lmax,1)} mm`});
   if(W>p.Wmax)V.push({id:'W',m:`Modül genişliği ${f(W,1)} mm > maks. ${f(p.Wmax,1)} mm`});
   if(half&&nr%2)V.push({id:'nr',m:'Half-cut dizilimde sütun başına parça sayısı çift olmalı'});
+  if(p.Vmp>=p.Voc)V.push({id:'Vmp',m:`Hücre Vmpp (${f(p.Vmp,4)} V) Voc’den (${f(p.Voc,4)} V) küçük olmalı`});
+  if(p.Imp>=p.Isc)V.push({id:'Imp',m:`Hücre Impp (${f(p.Imp,3)} A) Isc’den (${f(p.Isc,3)} A) küçük olmalı`});
+  {const ff=Pc/(p.Voc*p.Isc)*100;if(ff<74||ff>87)V.push({id:'FF',m:`Hücre FF %${f(ff,2)} olağan dışı (beklenen %74–87); Voc, Isc, Vmpp, Impp değerlerini kontrol edin`});}
   if(lOn<=0)V.push({id:'ov',m:'Tel uç boşluğu hücre boyunun yarısından büyük'});
   if(p.frameV!=='none'&&p.fOv>=Math.min(p.eW,p.eL))V.push({id:'fOv',m:`Çerçeve dudağı (${f(p.fOv,1)} mm) hücreye kadar uzanıyor; kenar mesafesinden küçük olmalı`});
   if(p.frameV==='none'&&rear.kind==='bs')V.push({id:'fr',m:'Backsheet’li modül çerçevesiz olamaz'});
@@ -386,7 +390,7 @@ function runMC(p,tol){
     q.tgf=p.tgf+dev(T('tgf'));q.tgr=p.tgr+dev(T('tgr'));q.dw=p.dw+dev(T('dw'));
     const r=evaluate(q,true);
     const Lm=r.L+dev(p.fT),Wm=r.W+dev(p.fT);
-    const Pi=r.P*(1+gauss()*p.sP/100)*(1+gauss()*p.sCTM/100)*(1+gauss()*p.sMeas/100);
+    const Pi=r.P*(1+gauss()*p.sCTM/100)*(1+gauss()*p.sMeas/100);
     const es=Math.min(eLeft,eRight),eb=Math.min(eL+oy,eL-oy)-p.bg-p.bw;
     P[i]=Pi;E[i]=Pi/(Lm*Wm/1e6*10);Ls[i]=Lm;Ws[i]=Wm;eS[i]=es;eB[i]=eb;
     const a1=es<p.eMin,a2=eb<p.eMin,a3=Lm>p.Lmax,a4=Wm>p.Wmax,a5=Pi<p.Pplate;

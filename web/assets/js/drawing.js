@@ -47,7 +47,7 @@ function G(){
   return {p,fc,U0,V0,rowU,colV,L:R.L,W:R.W,Lg:R.Lg,Wg:R.Wg};
 }
 /* Modül sahnesi: model mm, kalınlık k ile ölçekli; detay=true ise tel ve pah gerçek ölçüde */
-function scene(k,opt={}){
+function dwScene(k,opt={}){
   const g=G(),p=g.p,sw=v=>(v*k).toFixed(3);let s='';
   s+=`<rect class="gls" x="${g.fc}" y="${g.fc}" width="${g.Lg}" height="${g.Wg}" style="stroke-width:${sw(0.25)}"/>`;
   if(g.fc>0){const o=g.fc+p.fOv;
@@ -82,7 +82,7 @@ function sheet1(){
   const P=(u,v)=>[X+u/k,Y+v/k];
   // ÖN GÖRÜNÜŞ
   o+=title(X,18,'ÖN GÖRÜNÜŞ',sc(k));
-  o+=`<g transform="translate(${X} ${Y}) scale(${1/k})">${scene(k,{wires:true})}</g>`;
+  o+=`<g transform="translate(${X} ${Y}) scale(${1/k})">${dwScene(k,{wires:true})}</g>`;
   const [x0,y0]=P(0,0),[x1,y1]=P(g.L,g.W),[gx0,gy0]=P(g.fc,g.fc),[gx1,gy1]=P(g.fc+g.Lg,g.fc+g.Wg);
   const tolL=`±${f(p.gT+(g.fc>0?p.fT:0),1)}`;
   o+=dH(x0,x1,y0,y0-8,`${f(g.L,1)} ${tolL}`,{bad:R.bad.has('L')});
@@ -233,7 +233,7 @@ function detailBox(x,y,bw,bh,name,u0,v0,ww,wh,dims){
   const m=fitEnl(ww,wh,bw-22,bh-22),X=x+12,Y=y+14,id='cp'+name.replace(/\W/g,'');
   let o=title(x,y,name,sc(1/m));
   o+=`<defs><clipPath id="${id}"><rect x="${u0}" y="${v0}" width="${ww}" height="${wh}"/></clipPath></defs>`;
-  o+=`<g transform="translate(${X-u0*m} ${Y-v0*m}) scale(${m})"><g clip-path="url(#${id})">${scene(1/m,{detail:true})}</g></g>`;
+  o+=`<g transform="translate(${X-u0*m} ${Y-v0*m}) scale(${m})"><g clip-path="url(#${id})">${dwScene(1/m,{detail:true})}</g></g>`;
   o+=rc(X,Y,ww*m,wh*m,'win');
   const P=(u,v)=>[X+(u-u0)*m,Y+(v-v0)*m];
   return o+dims(P,m,X,Y,ww*m,wh*m);
@@ -286,24 +286,39 @@ function cellDetail(x,y,bw,bh){
   o+=t(x,y+bh-1,1.9,`${p.nbb} ${p.tech==='BC'||p.tech==='MWT'?'arka kontak':'bağlantı teli'} · ${(LIB.tech.items[p.techV]||{}).l||p.tech} · ${f(p.P/(R.half?2:1),2)} W / parça`,{c:'mut'});
   return o;
 }
+/* Elektrik şeması — fiziksel yerleşim:
+   Yarım hücre: üst ve alt yarı ayna simetrik; diziler dış uçta (üst/alt kenar) ikişer köprülenir,
+   ortadaki bara üst ve alt yarıyı paralel bağlar; bypass diyotları ve J-box'lar ortadadır.
+   Tam hücre: diziler alt uçta köprülenir; düğümler, diyotlar ve J-box üst uçtadır. */
 function schematic(x,y,bw,bh){
-  const p=S.p;let o=title(x,y,'ELEKTRİK ŞEMASI')+t(x+bw,y,2.1,`${R.Ns} seri × ${R.Np} paralel · ${Math.max(1,Math.round(R.nc/2))} bypass diyot`,{a:'end',c:'mut'});
-  const nSub=Math.max(1,Math.round(R.nc/2)),X=x+8,Y=y+14,W=bw-16,H=bh-26,sw=W/nSub;
-  const half=R.half&&R.lo>0,cellsPerStr=half?R.up:R.nr;
-  for(let s=0;s<nSub;s++){const sx=X+s*sw+4,w=sw-8;
-    const rows=half?2:1;
-    for(let r=0;r<rows;r++){const ry=Y+(half?r*(H/2):H*0.15),rh=half?H/2-6:H*0.55;
-      o+=rc(sx,ry,w,rh,'sbox');
-      o+=t(sx+w/2,ry+rh/2-1,2.1,`dizi ${2*s+1}–${2*s+2}${half?(r?' · alt':' · üst'):''}`,{a:'middle',w:600})+t(sx+w/2,ry+rh/2+2.6,1.8,`${2*cellsPerStr} ${R.half?'yarım hücre':'hücre'} seri`,{a:'middle',c:'mut'});
-      o+=ln(sx,ry+rh/2,sx-4,ry+rh/2)+ln(sx+w,ry+rh/2,sx+w+4,ry+rh/2);}
-    if(half){o+=ln(sx-4,Y+H/4-3,sx-4,Y+3*H/4-3)+ln(sx+w+4,Y+H/4-3,sx+w+4,Y+3*H/4-3);}
-    // bypass diyot
-    const dy=Y+H+3,dx=sx+w/2;o+=ln(sx-4,half?Y+H/2-3:Y+H*0.15+H*0.275,sx-4,dy)+ln(sx+w+4,half?Y+H/2-3:Y+H*0.15+H*0.275,sx+w+4,dy)+ln(sx-4,dy,dx-2.5,dy)+ln(dx+2.5,dy,sx+w+4,dy);
-    o+=`<polygon class="dio" points="${dx+2.5},${dy} ${dx-2.5},${dy-2.2} ${dx-2.5},${dy+2.2}"/>`+ln(dx+2.5,dy-2.4,dx+2.5,dy+2.4,'lt');
-    o+=t(dx,dy+5,1.8,`D${s+1}`,{a:'middle',c:'mut'});
+  const nc=R.nc,half=R.half&&R.lo>0,nSub=Math.max(1,Math.floor(nc/2)),per=half?R.up:R.nr;
+  let o=title(x,y,'ELEKTRİK ŞEMASI')+t(x+bw,y,2,`${R.Ns} seri × ${R.Np} paralel · ${nSub} bypass diyot · J-box ${half?'modül ortasında':'üst uçta'}`,{a:'end',c:'mut'});
+  const X=x+16,Wd=bw-32,Y=y+9,H=bh-17,cw=Wd/nc,cx=j=>X+cw*(j+0.5),sw=Math.min(cw*0.46,14);
+  const str=(j,y1,y2,lbl)=>{let g=`<rect class="sbox" x="${cx(j)-sw/2}" y="${y1}" width="${sw}" height="${y2-y1}"/>`;
+    const n=Math.min(per,12);for(let k=1;k<n;k++){const yy=y1+(y2-y1)*k/n;g+=ln(cx(j)-sw/2,yy,cx(j)+sw/2,yy,'tl');}
+    return g+t(cx(j),(y1+y2)/2,1.8,lbl,{a:'middle',r:-90,c:'dt'});};
+  const diode=(xa,xb,yy,lab)=>{const m=(xa+xb)/2;return ln(xa,yy,m-2.4,yy,'lt')+ln(m+2.4,yy,xb,yy,'lt')+`<polygon class="dio" points="${m+2.4},${yy} ${m-2.4},${yy-2.1} ${m-2.4},${yy+2.1}"/>`+ln(m+2.4,yy-2.3,m+2.4,yy+2.3,'lt')+t(m,yy+5.2,1.8,lab,{a:'middle',w:600});};
+  if(half){
+    const ym=Y+H/2,gap=8,top=Y+4,bot=Y+H-4;
+    for(let j=0;j<nc;j++){o+=str(j,top,ym-gap,`dizi ${j+1} · üst · ${per} yarım hücre`)+str(j,ym+gap,bot,`dizi ${j+1} · alt · ${per} yarım hücre`);
+      o+=ln(cx(j),ym-gap,cx(j),ym+gap,'lt');}
+    for(let s=0;s<nSub;s++){const a=cx(2*s),b=cx(2*s+1);
+      o+=ln(a,top,a,top-2.5,'lt')+ln(a,top-2.5,b,top-2.5,'lt')+ln(b,top-2.5,b,top,'lt');
+      o+=ln(a,bot,a,bot+2.5,'lt')+ln(a,bot+2.5,b,bot+2.5,'lt')+ln(b,bot+2.5,b,bot,'lt');
+      o+=`<rect class="jbx" x="${a-sw/2-1.5}" y="${ym-4.2}" width="${b-a+sw+3}" height="8.4"/>`+diode(a,b,ym,`D${s+1}`);
+      if(s<nSub-1)o+=ln(b,ym,cx(2*s+2),ym,'lt');}
+    o+=t(X+Wd/2,top-4.5,1.8,'üst kenar köprüleri',{a:'middle',c:'mut'})+t(X+Wd/2,bot+6.5,1.8,'alt kenar köprüleri',{a:'middle',c:'mut'});
+    o+=ln(cx(0),ym,X-6,ym,'cab')+t(X-7,ym+1.2,3,'−',{a:'end',w:700})+ln(cx(nc-1),ym,X+Wd+6,ym,'cab')+t(X+Wd+7,ym+1.2,3,'+',{w:700});
+  }else{
+    const top=Y+12,bot=Y+H-4,yn=Y+6;
+    for(let j=0;j<nc;j++)o+=str(j,top,bot,`dizi ${j+1} · ${per} hücre`)+ln(cx(j),top,cx(j),yn,'lt');
+    for(let s=0;s<nSub;s++){const a=cx(2*s),b=cx(2*s+1);
+      o+=ln(a,bot,a,bot+2.5,'lt')+ln(a,bot+2.5,b,bot+2.5,'lt')+ln(b,bot+2.5,b,bot,'lt')+diode(a,b,yn,`D${s+1}`);
+      if(s<nSub-1)o+=ln(b,yn,cx(2*s+2),yn,'lt');}
+    o+=`<rect class="jbx" x="${cx(0)-sw/2}" y="${yn-4.2}" width="${cx(nc-1)-cx(0)+sw}" height="8.4"/>`;
+    o+=ln(cx(0),yn,X-6,yn,'cab')+t(X-7,yn+1.2,3,'−',{a:'end',w:700})+ln(cx(nc-1),yn,X+Wd+6,yn,'cab')+t(X+Wd+7,yn+1.2,3,'+',{w:700});
   }
-  o+=t(X-2,Y+H/2,3,'−',{a:'end',w:700})+t(X+W+2,Y+H/2,3,'+',{w:700});
-  if(half)o+=t(X,Y-3,1.9,'Üst yarı ∥ alt yarı (yarım hücre paralel bağlantı)',{c:'mut'});
+  o+=t(x,y+bh-1,1.8,'Normal çalışmada diyotlar ters kutuplu; gölgelenen alt diziyi köprüler. Kesikli çerçeve: J-box.',{c:'mut'});
   return o;
 }
 function elecTable(x,y,w,h){
@@ -344,7 +359,7 @@ const SHEET_CSS=`text{font-family:"IBM Plex Sans","Arial Narrow",Arial,sans-seri
 .tb{fill:none;stroke:#141414;stroke-width:.4}.tl{fill:none;stroke:#141414;stroke-width:.15}
 .win{fill:none;stroke:#141414;stroke-width:.25}
 .bc{fill:#fff;stroke:#141414;stroke-width:.25}.dot{fill:#141414}
-.sbox{fill:#eef2f8;stroke:#141414;stroke-width:.25}.dio{fill:#141414}.cutl{stroke:#c1121f;stroke-width:.35;stroke-dasharray:1.5 .8}`;
+.sbox{fill:#eef2f8;stroke:#141414;stroke-width:.25}.jbx{fill:none;stroke:#141414;stroke-width:.25;stroke-dasharray:1.2 .7}.dio{fill:#141414}.cutl{stroke:#c1121f;stroke-width:.35;stroke-dasharray:1.5 .8}`;
 const HATCH=`<defs><pattern id="hatch" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.6" height="1.6" fill="#e3e6ea"/><line x1="0" y1="0" x2="0" y2="1.6" stroke="#141414" stroke-width=".18"/></pattern></defs>`;
 
 function renderSheets(){

@@ -89,7 +89,9 @@ for(const [id,l,era,cat,eta,Voc,Jsc,jmp,th,tc,bVoc,aIsc,bif,ag,lid,ann,price,spe
   add('tech',id,{l,era,cat,eta,Voc,Jsc,jmp,th,tc,bVoc,aIsc,bif,ag,lid,ann,price,spec});
 
 /* ---- Tel / ribbon ---- */
-mk('wire',[[0.16,'0BB / 24BB+','now'],[0.18,'0BB / 20BB+','now'],[0.20,'18–20BB','now'],[0.22,'16–18BB','now'],[0.24,'16BB','now'],[0.26,'12–16BB','now'],[0.28,'12BB','mid'],[0.30,'MBB 10–12BB','mid'],[0.32,'MBB 10BB','mid'],[0.35,'MBB 9BB','mid'],[0.40,'MBB 6–9BB (ilk nesil)','mid']],
+mk('wire',Array.from({length:26},(_,i)=>{const d=+(0.15+i*0.01).toFixed(2);
+    const s=d<=0.18?'0BB / 20BB+':d<=0.21?'18–20BB':d<=0.23?'16–18BB':d<=0.26?'16BB':d<=0.29?'12–16BB':d<=0.33?'MBB 10–12BB':d<=0.36?'MBB 9BB':'MBB 6–9BB (ilk nesil)';
+    return [d,s,d<=0.28?'now':'mid'];}),
   ([d,s,era])=>['r'+n100(d),{l:`Yuvarlak tel Ø${fx(d,2)} mm`,spec:s,era,mat:'Cu (OFC)',ys:d<0.25?110:90,set:{wt:'round',dw:d},price:+(11+(0.4-d)*8).toFixed(2)}]);
 mk('wire',[[0.20,'0BB'],[0.22,'0BB'],[0.25,'0BB / MBB']],([d,s])=>['t'+n100(d),{l:`Üçgen kesitli tel ${fx(d,2)} mm`,spec:s+', ışığı hücreye yönlendirir',mat:'Cu (OFC)',ys:110,set:{wt:'tri',dw:d},price:14}]);
 add('wire','seg26',{l:'Segment tel Ø0,26 mm (aralıkta yassılaştırılmış)',spec:'paving / sıfır aralık dizilim',mat:'Cu (OFC)',ys:100,set:{wt:'round',dw:0.26},price:13.5});
@@ -215,10 +217,11 @@ function cellFrom(p,etaOv){
   const F=LIB.fmt.items[p.fmtV],T=LIB.tech.items[p.techV];if(!F||!T)return;
   p.a=F.a;p.b=F.b;p.ch=F.ch;p.tech=T.cat;
   const A=cellAreaCm2(p),eta=etaOv||T.eta,k=eta/T.eta;
-  p.eta=+eta.toFixed(3);p.P=+(eta/100*A*0.1).toFixed(3);
+  p.eta=+eta.toFixed(3);
   p.Voc=+(T.Voc*Math.pow(k,0.4)).toFixed(4);
   p.Isc=+(T.Jsc*A/1000*Math.pow(k,0.6)).toFixed(3);
   p.Imp=+(T.Jsc*A/1000*T.jmp*Math.pow(k,0.6)).toFixed(3);
+  const P=eta/100*A*0.1;p.Vmp=+(P/p.Imp).toFixed(4);p.P=+(p.Vmp*p.Imp).toFixed(3);p.FF=+(p.P/(p.Voc*p.Isc)*100).toFixed(2);
   p.mc=+(A*T.th*1e-4*2.33+0.3).toFixed(2);
   for(const k2 of ['tc','bVoc','aIsc','bif','ag','lid','ann'])p[k2]=T[k2];
 }

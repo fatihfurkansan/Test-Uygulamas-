@@ -58,16 +58,17 @@ function fromTemplate(id){
   for(const [k,v] of Object.entries(tp.lib))applyLib(d.p,k,v);
   for(const [k,v] of Object.entries(tp.set))if(k in SCH&&k!=='eta')d.p[k]=v;
   if(tp.set.eta)cellFrom(d.p,tp.set.eta);
+  cellDerived(d.p);
   d.p.Rb=rearRb(d.p);d.p.Tf=(LIB.enc.items[d.p.encFV]||{T:99}).T;
   if(tp.auto){const r=evaluate(d.p,true);d.p.Lmax=Math.ceil(r.L)+2;d.p.Wmax=Math.ceil(r.W)+2;}
   // etiket gücü: ölçülen gücün ≥ %97,7'si etiketin üstünde kalacak şekilde (nominal − 2σ), sınıf adımına yuvarlanır
-  if(tp.auto||!('Pplate' in tp.set)){const r=evaluate(d.p,true);const sg=Math.sqrt(d.p.sP**2+d.p.sCTM**2+d.p.sMeas**2)/100;d.p.Pplate=Math.floor(r.P*(1-2*sg)/d.p.bin)*d.p.bin;}
+  if(tp.auto||!('Pplate' in tp.set)){const r=evaluate(d.p,true);const sg=Math.sqrt(d.p.sCTM**2+d.p.sMeas**2)/100;d.p.Pplate=Math.floor(r.P*(1-2*sg)/d.p.bin)*d.p.bin;}
   return {name:tp.l,p:d.p,t:d.t,tpl:tp.id};
 }
 
 /* ---- Durum ---- */
 libApplyUser(LS.get('pvm.userlib'));
-let S=(()=>{const dr=LS.get('pvm.draft');if(dr&&dr.p){const b=defaults();return {name:dr.name||'Tasarım',p:Object.assign(b.p,dr.p),t:Object.assign(b.t,dr.t||{}),tpl:dr.tpl||''};}return fromTemplate(TEMPLATES[0].id);})();
+let S=(()=>{const dr=LS.get('pvm.draft');if(dr&&dr.p){const b=defaults();const p=Object.assign(b.p,dr.p);if(!dr.p.Vmp)p.Vmp=0;return {name:dr.name||'Tasarım',p:cellDerived(p),t:Object.assign(b.t,dr.t||{}),tpl:dr.tpl||''};}return fromTemplate(TEMPLATES[0].id);})();
 let R=null,MC=null,DL=null;
 let SAVED=LS.get('pvm.saved');
 if(!Array.isArray(SAVED)){
@@ -88,6 +89,7 @@ function rowHTML(s){
     const opts=(s.type==='lib'?libOpts(s):s.opts).map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('');
     return `<div class="row wide" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><select id="${id}" data-k="${s.k}">${opts}</select></div>`;
   }
+  if(s.type==='calc')return `<div class="row" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><div class="val"><input type="text" id="${id}" data-k="${s.k}" data-calc="${s.d||2}" readonly tabindex="-1" class="calc"><span class="u">${esc(s.u)}</span></div><div></div></div>`;
   if(s.type==='text')return `<div class="row wide" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><input type="text" id="${id}" data-k="${s.k}" class="txt"></div>`;
   if(s.type==='bool')return `<div class="row" data-row="${s.k}"><label for="${id}">${esc(s.l)}${hint}</label><div class="val"><input type="checkbox" id="${id}" data-k="${s.k}"></div><div></div></div>`;
   const tol=s.tol!==undefined?`<div class="tol"><span>±</span><input type="text" inputmode="decimal" id="tol-${s.k}" data-tol="${s.k}" aria-label="${esc(s.l)} toleransı"></div>`:'<div></div>';
@@ -109,7 +111,7 @@ function buildInputs(){
 }
 function syncInputs(){
   for(const el of $$('[data-k]')){const k=el.dataset.k,v=S.p[k];
-    if(el.type==='checkbox')el.checked=!!v;else if(el.tagName==='SELECT')el.value=v;else if(document.activeElement!==el){el.value=fmtIn(v);el.classList.remove('err');}}
+    if(el.type==='checkbox')el.checked=!!v;else if(el.tagName==='SELECT')el.value=v;else if(el.dataset.calc)el.value=f(v,+el.dataset.calc);else if(document.activeElement!==el){el.value=fmtIn(v);el.classList.remove('err');}}
   for(const el of $$('[data-tol]')){if(document.activeElement!==el){el.value=fmtIn(S.t[el.dataset.tol]??0);el.classList.remove('err');}}
   $('#in-name').value=S.name;
 }
@@ -131,12 +133,14 @@ function onField(el){
     if(s.int)v=Math.round(v);
     el.classList.remove('err');S.p[k]=v;
     const A=cellAreaCm2(S.p);
-    if(k==='eta'){S.p.P=+(v/100*A*0.1).toFixed(3);setVal('P');}
-    else if(k==='P'||k==='a'||k==='b'||k==='ch'){S.p.eta=+(S.p.P/(A*0.1)*100).toFixed(3);setVal('eta');}
+    if(['Voc','Isc','Vmp','Imp','a','b','ch'].includes(k)){cellDerived(S.p);for(const c of ['P','eta','FF'])setVal(c);}
   }
   schedule(true);
 }
-function setVal(k){const el=$('#in-'+k);if(el)el.value=fmtIn(S.p[k]);}
+function setVal(k){const el=$('#in-'+k);if(el)el.value=el.dataset.calc?f(S.p[k],+el.dataset.calc):fmtIn(S.p[k]);}
+/* Hücre türetilmiş değerleri: Pmax = Vmpp·Impp, verim, FF */
+function cellDerived(p){if(!(p.Vmp>0)&&p.P>0&&p.Imp>0)p.Vmp=+(p.P/p.Imp).toFixed(4);
+  p.P=+(p.Vmp*p.Imp).toFixed(4);p.eta=+(p.P/(cellAreaCm2(p)*0.1)*100).toFixed(3);p.FF=+(p.P/(p.Voc*p.Isc)*100).toFixed(2);return p;}
 document.addEventListener('input',e=>{const el=e.target;if(el.matches('input[type=text][data-k],input[data-tol],#in-name'))onField(el);});
 document.addEventListener('change',e=>{const el=e.target;if(el.matches('select,input[type=checkbox]'))onField(el);});
 
@@ -154,7 +158,7 @@ function mcAuto(){const key=mcInputKey();if(MC&&key===mcKey)return;
 function recompute(){
   R=evaluate(S.p);
   LS.set('pvm.draft',{name:S.name,p:S.p,t:S.t,tpl:S.tpl});
-  renderKPI();renderSummary();renderViol();renderDrawings();renderCTM();renderCost();renderCompare();
+  renderKPI();renderSummary();renderMini();renderViol();renderDrawings();renderCTM();renderCost();renderCompare();
   mcAuto();
   for(const r of $$('.row[data-row]'))r.classList.toggle('bad',R.bad.has(r.dataset.row));
   $('#gs-cell').textContent=`${S.p.tech} · ${f(S.p.a,1)}×${f(S.p.b,1)} · ${f(S.p.P,2)} W`;
@@ -177,6 +181,18 @@ function renderSummary(){
     ['Ağırlık / alan',f(m.total/(R.Amod/1e6),1)+' kg/m²'],['Maliyet',S.p.cur+f(R.bom.total,2)],[S.p.cur+'/W',f(R.bom.perW,4)]
   ].map(([i,b,h])=>`<div class="stat${h?' hl':''}"><i>${i}</i><b>${b}</b></div>`).join('');
 }
+function renderMini(){
+  const st=R.steps.filter(s=>Math.abs(s.k-1)>1e-9);
+  $('#ctmMini').innerHTML=`<div class="mrow h"><span>Σ hücre gücü <small>${R.N} × ${f(R.Pcells/R.N,3)} W</small></span><b>${f(R.Pcells,1)} W</b></div>`+
+    st.map(s=>`<div class="mrow"><span>${esc(s.l)}</span><b class="${s.dW>=0?'pos':'neg'}">${fs(s.dW,1)} W</b></div>`).join('')+
+    `<div class="mrow t"><span>Modül Pmax · CTM ${f(R.CTM,2)} %</span><b>${f(R.P,1)} W</b></div>`;
+}
+$('#measApply').onclick=()=>{const v=parseNum($('#measP').value),m=$('#measOut');
+  if(!(v>0)){m.className='msg er';m.textContent='Geçerli bir güç girin (W).';return;}
+  const base=R.P/S.p.kCal,old=R.P,k=v/base;
+  if(k<0.8||k>1.2){m.className='msg er';m.textContent=`Ölçüm modelden %${f(Math.abs(k-1)*100,1)} farklı. Hücre gücünü, dizilimi ve malzemeleri kontrol edin; kalibrasyon ±%20 ile sınırlıdır.`;return;}
+  S.p.kCal=+k.toFixed(4);syncInputs();schedule();
+  m.className='msg ok';m.textContent=`k_kal = ${f(k,4)} uygulandı (model ${f(old,1)} W → ${f(v,1)} W, fark ${fs((v/old-1)*100,2)} %). Bu çarpan tüm tasarım varyantlarına uygulanır; ayrıntılı kalibrasyon CTM sekmesinde.`;};
 function renderViol(){
   const html=R.viol.length?R.viol.map(v=>`<div>${esc(v.m)}</div>`).join(''):'<p class="okmsg">Tüm sınır kontrolleri uygun.</p>';
   $('#violBox').innerHTML=html;
@@ -402,7 +418,7 @@ function renderCompare(){
   const ds=SAVED.filter(d=>CMP.sel.includes(d.id));
   if(!ds.length){$('#cmpTbl').innerHTML='<p class="note">Karşılaştırmak için en az bir tasarım işaretleyin.</p>';$('#cmpDiff').innerHTML='';return;}
   const ref=SAVED.find(d=>d.id===CMP.ref)||ds[0];
-  const ev=d=>{const b=defaults();const p=Object.assign(b.p,d.p);return {d,p,R:evaluate(p)};};
+  const ev=d=>{const b=defaults();const p=cellDerived(Object.assign(b.p,d.p,d.p.Vmp?{}:{Vmp:0}));return {d,p,R:evaluate(p)};};
   const E=[ev(ref),...ds.filter(d=>d!==ref).map(ev)];
   const c=S.p.cur;
   const M=[['Pmax','W',1,r=>r.P,1],['Modül verimi','%',2,r=>r.eta,1],['CTM','%',2,r=>r.CTM,1],['Modül maliyeti',c,2,r=>r.bom.total,-1],[c+'/W','',4,r=>r.bom.perW,-1],
@@ -420,7 +436,7 @@ function renderCompare(){
   $('#cmpDiff').innerHTML=rows.length?`<table><tr><th>Girdi</th>${E.map((e,i)=>`<th>${i===0?'◉ ':''}${esc(e.d.name)}</th>`).join('')}</tr>${rows.map(k=>`<tr><td>${esc(SCH[k].l)}</td>${E.map(e=>`<td>${esc(fmtV(k,e.p[k]))}</td>`).join('')}</tr>`).join('')}</table>`:'<p class="note">Seçili tasarımların girdileri aynı.</p>';
 }
 $('#savedList').addEventListener('click',e=>{const t=e.target;
-  if(t.dataset.cload){const d=SAVED.find(x=>x.id===t.dataset.cload);if(d){const b=defaults();S={name:d.name,p:Object.assign(b.p,JSON.parse(JSON.stringify(d.p))),t:Object.assign(b.t,d.t||{}),tpl:''};MC=null;mcKey='';syncInputs();recompute();go('tasarim');}}
+  if(t.dataset.cload){const d=SAVED.find(x=>x.id===t.dataset.cload);if(d){const b=defaults();S={name:d.name,p:cellDerived(Object.assign(b.p,JSON.parse(JSON.stringify(d.p)),d.p.Vmp?{}:{Vmp:0})),t:Object.assign(b.t,d.t||{}),tpl:''};MC=null;mcKey='';syncInputs();recompute();go('tasarim');}}
   if(t.dataset.cdel){SAVED=SAVED.filter(x=>x.id!==t.dataset.cdel);CMP.sel=CMP.sel.filter(x=>x!==t.dataset.cdel);if(CMP.ref===t.dataset.cdel)CMP.ref=SAVED[0]?SAVED[0].id:'';saveLS();renderCompare();}});
 $('#savedList').addEventListener('change',e=>{const t=e.target;
   if(t.dataset.csel){if(t.checked){if(!CMP.sel.includes(t.dataset.csel))CMP.sel.push(t.dataset.csel);}else CMP.sel=CMP.sel.filter(x=>x!==t.dataset.csel);saveLS();renderCompare();}
@@ -430,7 +446,7 @@ $('#savedList').addEventListener('change',e=>{const t=e.target;
 const designJSON=()=>({schema:'pv-modul-tasarim',version:1,name:S.name,saved:new Date().toISOString(),params:S.p,tolerances:S.t});
 function loadDesign(o){
   if(!o||o.schema!=='pv-modul-tasarim'||!o.params)throw new Error('Bu dosya bir PV modül tasarımı değil (schema alanı eksik).');
-  const b=defaults();S={name:o.name||'Yüklenen tasarım',p:Object.assign(b.p,o.params),t:Object.assign(b.t,o.tolerances||{}),tpl:''};
+  const b=defaults();S={name:o.name||'Yüklenen tasarım',p:cellDerived(Object.assign(b.p,o.params,o.params.Vmp?{}:{Vmp:0})),t:Object.assign(b.t,o.tolerances||{}),tpl:''};
   MC=null;mcKey='';syncInputs();recompute();
 }
 const TRMAP={ç:'c',ğ:'g',ı:'i',ö:'o',ş:'s',ü:'u',Ç:'C',Ğ:'G',İ:'I',Ö:'O',Ş:'S',Ü:'U'};
@@ -457,7 +473,7 @@ $('#dlXlsx').onclick=()=>{
     add('Monte Carlo',rows,[26,14,12,10,10,16,16]);}
   const ds=SAVED.filter(d=>CMP.sel.includes(d.id));
   if(ds.length){const rows=[['Tasarım','Pmax (W)','Verim (%)','CTM (%)','Maliyet ('+c+')',c+'/W','L (mm)','W (mm)','Ağırlık (kg)','ΔPmax','Δverim','Δmaliyet','Δ'+c+'/W']];
-    const ref=SAVED.find(d=>d.id===CMP.ref)||ds[0];const ev=d=>{const b=defaults();return evaluate(Object.assign(b.p,d.p));};const r0=ev(ref);
+    const ref=SAVED.find(d=>d.id===CMP.ref)||ds[0];const ev=d=>{const b=defaults();return evaluate(cellDerived(Object.assign(b.p,d.p,d.p.Vmp?{}:{Vmp:0})));};const r0=ev(ref);
     for(const d of [ref,...ds.filter(x=>x!==ref)]){const r=ev(d);rows.push([d.name+(d===ref?' (referans)':''),r.P,r.eta,r.CTM,r.bom.total,r.bom.perW,r.L,r.W,r.mass.total,r.P-r0.P,r.eta-r0.eta,r.bom.total-r0.bom.total,r.bom.perW-r0.bom.perW]);}
     add('Karşılaştırma',rows,[40,10,10,10,12,10,10,10,10,10,10,10,10]);}
   const buf=X.write(wb,{bookType:'xlsx',type:'array'});
