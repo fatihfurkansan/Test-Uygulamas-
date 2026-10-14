@@ -24,6 +24,10 @@
 html,body{background:var(--bg);color:var(--fg)}
 body{margin:0;font-family:var(--f-body);font-size:14px;line-height:1.45;padding-bottom:env(safe-area-inset-bottom,0px);-webkit-text-size-adjust:100%}
 [hidden]{display:none!important}
+/* Telefonda yatay taşma olmasın: hiçbir öğe sayfayı ekrandan genişletmesin (iOS sayfayı küçültür) */
+html{overflow-x:hidden}
+main,.top{overflow-x:clip;max-width:100%}
+@supports not (overflow:clip){main{overflow-x:hidden}}
 img{max-width:100%}
 *{box-sizing:border-box}
 .wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1320px;margin:0 auto}
@@ -62,7 +66,7 @@ main{padding-block:16px 48px}
 .cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .note{font-size:12.5px;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
-.design{display:grid;grid-template-columns:1fr;gap:14px}
+.design{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 .side-draw{display:none}
 @media (min-width:980px){.design{grid-template-columns:minmax(0,1fr) minmax(0,.9fr)}.side-draw{display:block;position:sticky;top:120px;align-self:start}}
 
@@ -80,13 +84,13 @@ details.grp>summary::-webkit-details-marker{display:none}
 details.grp>summary h3::before{content:"▸";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
 details.grp[open]>summary h3::before{transform:rotate(90deg)}
 .rows{padding:0 14px 12px;display:flex;flex-direction:column}
-.rowhead{display:grid;grid-template-columns:1fr 7.2rem 5.2rem;gap:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--line)}
+.rowhead{display:grid;grid-template-columns:minmax(0,1fr) 7.2rem 5.2rem;gap:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--line)}
 .rowhead span:nth-child(2),.rowhead span:nth-child(3){text-align:right}
-.row{display:grid;grid-template-columns:1fr 7.2rem 5.2rem;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 7.2rem 5.2rem;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
 .row:last-child{border-bottom:0}
 .row label{min-width:0;font-size:13.5px}
 .row label small{display:block;font-size:11.5px;line-height:1.3}
-.row.wide{grid-template-columns:1fr minmax(0,13rem)}
+.row.wide{grid-template-columns:minmax(0,1fr) minmax(0,13rem)}
 .val{display:flex;align-items:center;gap:4px;justify-content:flex-end}
 .val input[type=text]{width:100%;min-width:0;text-align:right}
 .u{font-size:11.5px;color:var(--muted);min-width:2.2em}
@@ -98,7 +102,7 @@ input.err{border-color:var(--bad);background:var(--bad-soft)}
 .tol input{width:100%;text-align:right}
 input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 .row.bad label{color:var(--bad)}
-@media (max-width:420px){.row,.rowhead{grid-template-columns:1fr 6.4rem 4.6rem;gap:6px}}
+@media (max-width:420px){.row,.rowhead{grid-template-columns:minmax(0,1fr) 6.4rem 4.6rem;gap:6px}}
 
 .btns{display:flex;flex-wrap:wrap;gap:8px}
 .btn{appearance:none;border:1px solid var(--line);background:var(--surface);padding:8px 12px;border-radius:4px;cursor:pointer;font-weight:500}
@@ -186,7 +190,7 @@ a.brand{color:inherit;text-decoration:none}
 .libbar{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:8px;align-items:center;margin-bottom:6px}
 .libbar input[type=search]{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:14px;font-family:var(--f-body);width:100%;min-width:0}
 .libbar .own{grid-column:1/-1;font-size:13px;display:flex;gap:6px;align-items:center}
-@media (max-width:700px){.libbar{grid-template-columns:1fr 1fr}.libbar input[type=search]{grid-column:1/-1}}
+@media (max-width:700px){.libbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.libbar input[type=search]{grid-column:1/-1}}
 .liblist{display:flex;flex-direction:column}
 h3.libcat{margin:14px 0 4px;font-size:1rem;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:4px}
 h3.libcat small{font-family:var(--f-mono);font-weight:400;font-size:11px}
@@ -204,9 +208,9 @@ h3.libcat small{font-family:var(--f-mono);font-weight:400;font-size:11px}
 dialog#libDlg{border:1px solid var(--line);border-radius:8px;background:var(--raised);color:var(--fg);padding:18px;width:min(640px,calc(100vw - 24px));max-height:calc(100dvh - 40px);overflow:auto}
 dialog#libDlg::backdrop{background:rgba(8,12,18,.55)}
 dialog#libDlg h2{margin-bottom:4px}
-dialog#libDlg .row.wide{grid-template-columns:1fr minmax(0,12rem)}
+dialog#libDlg .row.wide{grid-template-columns:minmax(0,1fr) minmax(0,12rem)}
 dialog#libDlg .row input[type=text]{width:100%;text-align:right}
-@media (max-width:520px){dialog#libDlg{padding:14px}dialog#libDlg .row.wide{grid-template-columns:1fr}}
+@media (max-width:520px){dialog#libDlg{padding:14px}dialog#libDlg .row.wide{grid-template-columns:minmax(0,1fr)}}
 .updbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;gap:10px;align-items:center;justify-content:center;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--raised);border-top:1px solid var(--line);font-size:13.5px}
 .recbox{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;border:1px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:10px 12px}
 .recbox i{display:block;font-style:normal;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
@@ -237,10 +241,10 @@ input.txt{text-align:left;font-family:var(--f-body)}
 .mrow b{font-family:var(--f-mono);font-weight:500;white-space:nowrap}
 .mrow b.pos{color:var(--good)}.mrow b.neg{color:var(--loss)}
 .mrow.h{font-weight:500}.mrow.t{border-top:1px solid var(--fg);margin-top:4px;padding-top:6px;font-weight:600}
-.calq{display:grid;grid-template-columns:1fr 8rem auto;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.calq{display:grid;grid-template-columns:minmax(0,1fr) 8rem auto;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .calq label{font-size:13.5px}.calq label small{display:block;color:var(--muted);font-size:11.5px}
 .calq input{width:100%;text-align:right}
-@media (max-width:520px){.calq{grid-template-columns:1fr 1fr}.calq label{grid-column:1/-1}}
+@media (max-width:520px){.calq{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.calq label{grid-column:1/-1}}
 input.calc{background:transparent;border-style:dashed;color:var(--muted);cursor:default}
 
 /* ---- Grafikler (Elektrik, Ölçüm, Saha) ---- */
@@ -274,3 +278,5 @@ tr.hit td{background:var(--accent-soft)}
 input.cin{width:6.5em;text-align:right;font-family:var(--f-mono);font-size:12.5px;padding:3px 6px}
 input.cin.txt{width:11em;text-align:left;font-family:var(--f-body)}
 #msMap .grp{margin-top:8px}
+/* iOS, 16 px altı yazılı giriş kutusuna dokununca sayfayı yakınlaştırır; dokunmatik ekranda 16 px kullan */
+@media (pointer:coarse){input[type=text],input[type=search],input:not([type]),select,textarea{font-size:16px!important}}

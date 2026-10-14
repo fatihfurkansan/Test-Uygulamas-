@@ -44,7 +44,7 @@ a{color:var(--accent)}
 
 .hero{padding-block:clamp(36px,7vw,84px) clamp(36px,6vw,72px)}
 .herogrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(24px,5vw,64px);align-items:center}
-@media (max-width:880px){.herogrid{grid-template-columns:1fr}}
+@media (max-width:880px){.herogrid{grid-template-columns:minmax(0,1fr)}}
 .lead{font-size:clamp(1.05rem,1.6vw,1.2rem);color:var(--muted);margin:1.1em 0 1.4em}
 .ctas{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1em}
 .herofig{margin:0;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
@@ -55,7 +55,7 @@ a{color:var(--accent)}
 .figbody{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1fr);gap:16px;align-items:center;margin-top:12px}
 .exdraw svg{width:100%;height:auto;max-height:340px;display:block}
 .exdraw .fr{fill:var(--frame)} .exdraw .gl{fill:var(--glass)} .exdraw .ce{fill:var(--cell)} .exdraw .wi{stroke:var(--cellwire);stroke-width:.6;vector-effect:non-scaling-stroke;opacity:.6}
-.exk{display:grid;grid-template-columns:1fr;gap:10px;margin:0}
+.exk{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0}
 .exk div{border-left:2px solid var(--line);padding-left:10px}
 .exk div:first-child{border-left-color:var(--accent)}
 .exk dt{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
@@ -66,19 +66,19 @@ section{padding-block:clamp(40px,7vw,80px)}
 .band{background:var(--surface);border-block:1px solid var(--line)}
 .feat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 32px;margin-top:8px}
 @media (max-width:900px){.feat{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:560px){.feat{grid-template-columns:1fr}}
+@media (max-width:560px){.feat{grid-template-columns:minmax(0,1fr)}}
 .feat article{border-top:2px solid var(--fg);padding-top:12px}
 .feat h3{margin-bottom:6px}
 .feat p{color:var(--muted);font-size:15px;margin:0}
 
 .two{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(24px,5vw,56px);align-items:start}
-@media (max-width:880px){.two{grid-template-columns:1fr}}
+@media (max-width:880px){.two{grid-template-columns:minmax(0,1fr)}}
 .formulas{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;background:var(--raised);overflow:hidden}
 .formulas div{display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);align-items:baseline}
 .formulas div:last-child{border-bottom:0}
 .formulas b{font-weight:500;font-size:14px;color:var(--muted)}
 .formulas code{font-family:var(--f-mono);font-size:14.5px;overflow-wrap:anywhere}
-@media (max-width:520px){.formulas div{grid-template-columns:1fr;gap:2px}}
+@media (max-width:520px){.formulas div{grid-template-columns:minmax(0,1fr);gap:2px}}
 
 .lead2{font-size:1.08rem;max-width:70ch}
 .lead2 b{font-family:var(--f-mono);font-weight:500}
@@ -89,12 +89,16 @@ section{padding-block:clamp(40px,7vw,80px)}
 .libc small{color:var(--muted);font-size:12.5px;line-height:1.4}
 h3.sub{margin-bottom:12px}
 .eras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-@media (max-width:760px){.eras{grid-template-columns:1fr}}
+@media (max-width:760px){.eras{grid-template-columns:minmax(0,1fr)}}
 .eras div{border-left:2px solid var(--accent);padding-left:12px}
 .eras p{color:var(--muted);font-size:14.5px;margin:4px 0 0}
 
 .steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0 24px}
-@media (max-width:820px){.steps{grid-template-columns:1fr}}
+@media (max-width:820px){.steps{grid-template-columns:minmax(0,1fr)}}
 .steps div{background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:16px}
 .steps ol{margin:8px 0 0;padding-left:1.2em;color:var(--muted);font-size:15px}
 .foot{border-top:1px solid var(--line);padding-block:24px;color:var(--muted);font-size:13.5px}
+/* Telefonda yatay taşma olmasın */
+html{overflow-x:hidden}
+main{overflow-x:clip}
+@supports not (overflow:clip){main{overflow-x:hidden}}
