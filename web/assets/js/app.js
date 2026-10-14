@@ -30,7 +30,7 @@ const TEMPLATES=[
   {id:'gb_perc_g1',era:'mid',auto:true,l:'Cam-backsheet · PERC G1 · 120 yarım hücre, 5BB',
     lib:{fmtV:'g1',techV:'perc',wireV:'f9x23',busV:'b5x35',glassFV:'g32ar',rearV:'bsKPf',encFV:'EVA',encRV:'EVA',frameV:'al35',cableV:'c40_1200'},set:{eta:22.2,half:true,nbb:5,wpad:0.7,nc:6,nr:20,gc:1.5,gm:6,eL:20,eW:15,ov:2}},
   {id:'gb_pert_m4',era:'mid',auto:true,l:'Cam-cam bifasiyal · n-PERT M4 · 72 tam hücre, 5BB',
-    lib:{fmtV:'m4',techV:'pert',wireV:'f9x23',busV:'b6x40',glassFV:'g25ar',rearV:'gc25',encFV:'POE',encRV:'POE',frameV:'al35',jboxV:'one3',cableV:'c40_1000'},set:{half:false,nbb:5,wpad:0.7,nc:6,nr:12,gc:2,gs:3,eL:24,eW:15,ov:2}},
+    lib:{fmtV:'m4',techV:'pert',wireV:'f9x23',busV:'b6x40',glassFV:'g25ar',rearV:'gc25',encFV:'POE',encRV:'POE',frameV:'al35',jboxV:'split25',cableV:'c40_1000'},set:{half:false,nbb:5,wpad:0.7,nc:6,nr:12,gc:2,gs:3,eL:24,eW:15,ov:2}},
   {id:'gb_mwt_m2',era:'mid',auto:true,l:'Cam-iletken backsheet · MWT PERC M2 · 60 tam hücre',
     lib:{fmtV:'m2',techV:'mwt',wireV:'f9x20',coatV:'bare',joinV:'eca',busV:'b6x40',glassFV:'g32ar',rearV:'bsMWT',encFV:'EVA',encRV:'EVA',frameV:'al35',jboxV:'one3',cableV:'c40_900'},set:{half:false,nbb:4,nc:6,nr:10,gc:2,gs:3,eL:24,eW:15,ov:2}},
   {id:'old72_mono',era:'old',auto:true,l:'Cam-backsheet · Al-BSF mono M2 · 72 tam hücre, 4BB',
@@ -105,6 +105,10 @@ function buildInputs(){
   $('#inputsCTM').innerHTML=groupHTML('ctm',false)+groupHTML('ds',false);
   $('#inputsMC').innerHTML=groupHTML('mc',true);
   $('#inputsMech').innerHTML=groupHTML('mech',false);
+  if($('#inputsIV'))$('#inputsIV').innerHTML=groupHTML('iv',false);
+  if($('#inputsShade'))$('#inputsShade').innerHTML=groupHTML('shade',true);
+  if($('#inputsLoad'))$('#inputsLoad').innerHTML=groupHTML('load',true);
+  if($('#inputsSite'))$('#inputsSite').innerHTML=groupHTML('site',true);
   $('#inputsCost').innerHTML=groupHTML('cost',false);
   $('#in-cur').innerHTML=SCH.cur.opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   $('#tplSel').innerHTML='<option value="">— Şablon seçin —</option>'+Object.entries(ERAS).map(([e,el])=>`<optgroup label="${esc(el)}">${TEMPLATES.filter(t=>t.era===e).map(t=>`<option value="${t.id}">${esc(t.l)}</option>`).join('')}</optgroup>`).join('');
@@ -489,9 +493,10 @@ $('#resetBtn').onclick=()=>{const b=$('#resetBtn');if(!resetArm){resetArm=true;b
   resetArm=false;b.textContent='Varsayılana dön';S=fromTemplate(TEMPLATES[0].id);MC=null;mcKey='';syncInputs();recompute();};
 
 /* ---- Sekmeler ---- */
-const TABS=['tasarim','cizim','ctm','tolerans','maliyet','kutuphane','karsilastir','kayit'];
-function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;if(t==='tolerans')mcAuto();if(t==='cizim'&&window.renderSheets)renderSheets();try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
+const TABS=['tasarim','cizim','ctm','elektrik','tolerans','olcum','maliyet','saha','kutuphane','karsilastir','kayit'];
+function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;if(t==='tolerans')mcAuto();if(t==='cizim'&&window.renderSheets)renderSheets();document.dispatchEvent(new CustomEvent('tabshown',{detail:t}));try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)go(b.dataset.tab);});
+window.addEventListener('hashchange',()=>go((location.hash||'').slice(1)));
 
 /* ---- Başlat ---- */
 buildInputs();syncInputs();recompute();go((location.hash||'').slice(1));

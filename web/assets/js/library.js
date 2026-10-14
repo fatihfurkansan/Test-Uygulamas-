@@ -38,7 +38,7 @@ const CATS={
   jbox:{l:'J-box gövdesi',grp:'Elektrik',param:'jboxV',pu:'/set',fields:[
     ['nJB','Parça sayısı','adet','set','num'],['Irat','Anma akımı','A','item','num'],['diode','Diyot','','item','text'],['ip','Koruma','','item','text'],['Vmax','Maks. sistem gerilimi','V','item','num']]},
   cable:{l:'Solar kablo (H1Z2Z2-K)',grp:'Elektrik',param:'cableV',pu:'/m',fields:[
-    ['cabA','Kesit','mm²','set','num'],['cabL','Boy (her kutup)','mm','set','num'],['Rkm','İletken direnci (20 °C)','Ω/km','item','num'],['od','Dış çap','mm','item','num']]},
+    ['cabA','Kesit','mm²','set','num'],['cabL','Boy (her kutup)','mm','set','num'],['Rkm','İletken direnci (20 °C)','Ω/km','item','num'],['Iz','Akım taşıma kapasitesi (serbest hava)','A','item','num'],['od','Dış çap','mm','item','num']]},
   conn:{l:'Konnektör',grp:'Elektrik',param:'connV',pu:'/çift',fields:[
     ['conR','Kontak direnci (çift)','mΩ','set','num'],['Irat','Anma akımı','A','item','num'],['Vmax','Anma gerilimi','V','item','num'],['ip','Koruma','','item','text']]},
   pot:{l:'J-box potting',grp:'Elektrik',param:'potV',pu:'/kg',fields:[['cure','Kürlenme','','item','text']]},
@@ -187,8 +187,8 @@ for(const [id,l,nJB,Irat,diode,Vmax,price,era,spec] of [
   ['rsd','Hızlı kapatma (rapid shutdown) entegre',1,20,'Schottky + MOSFET',1500,9.0,'now','NEC 690.12'],
   ['smart','Akıllı J-box (optimizer entegre)',1,15,'MLPE',1000,18.0,'now','izleme, MPPT']])
   add('jbox',id,{l,spec,era,Irat,diode,ip:'IP68',Vmax,set:{nJB},price});
-for(const [A,pm,Rkm,od] of [[2.5,0.45,8.21,5.4],[4,0.60,5.09,6.0],[6,0.85,3.39,6.7]])for(const L of [300,350,400,900,1000,1200,1400])
-  add('cable',`c${n10(A)}_${L}`,{l:`${fx(A,1)} mm² × ${L} mm`,spec:L>=900?'dikey montaj / eski tip':'yatay montaj',era:L>=900?'old':'now',Rkm,od,set:{cabA:A,cabL:L},price:pm});
+for(const [A,pm,Rkm,od,Iz] of [[2.5,0.45,8.21,5.4,41],[4,0.60,5.09,6.0,55],[6,0.85,3.39,6.7,70]])for(const L of [300,350,400,900,1000,1200,1400])
+  add('cable',`c${n10(A)}_${L}`,{l:`${fx(A,1)} mm² × ${L} mm`,spec:L>=900?'dikey montaj / eski tip':'yatay montaj',era:L>=900?'old':'now',Rkm,od,Iz,set:{cabA:A,cabL:L},price:pm});
 for(const [id,l,conR,Irat,price,spec] of [['mc4c','MC4 uyumlu (genel)',0.5,30,0.25,''],['stb','Stäubli MC4',0.3,30,1.0,'orijinal'],['evo2','Stäubli MC4-EVO2',0.3,45,1.2,'orijinal'],['h4','Amphenol H4',0.35,40,0.9,''],['te','TE Connectivity SOLARLOK',0.4,30,0.8,'']])
   add('conn',id,{l,spec,Irat,Vmax:1500,ip:'IP68',set:{conR},price});
 for(const [id,l,cure,price,era] of [['si2k','2K silikon','oda sıc., 2–4 saat',6.0,'now'],['si1k','1K silikon','nem, 24 saat',4.5,'mid'],['pu','Poliüretan','oda sıc.',5.0,'mid'],['none','Yok (contalı kutu)','—',0,'old']])

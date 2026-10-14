@@ -138,7 +138,7 @@ td.pos{color:var(--good)} td.neg{color:var(--loss)}
 /* drawing */
 .draw svg{width:100%;height:auto;display:block}
 .side-draw svg.main{max-height:74vh}
-svg text{fill:var(--dim);font-family:var(--f-mono)}
+svg:not(:where(.sheet)) text{fill:var(--dim);font-family:var(--f-mono)}
 svg .dim line,svg .dim path{stroke:var(--dim);fill:none}
 svg .dim polygon{fill:var(--dim)}
 svg .dim.bad line{stroke:var(--bad)} svg .dim.bad polygon{fill:var(--bad)} svg .dim.bad text{fill:var(--bad);font-weight:500}
@@ -228,6 +228,7 @@ input.txt{text-align:left;font-family:var(--f-body)}
   .printbox{display:block!important}
   .printpage{width:420mm;height:297mm;page-break-after:always;break-after:page}
   .printpage svg{width:420mm;height:297mm;display:block}
+  .printpage.a4{width:210mm;height:297mm}.printpage.a4 svg{width:210mm;height:297mm}
   html,body{background:#fff!important;padding:0!important}
 }
 .mini{margin-top:12px;border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:2px;font-size:13px}
@@ -241,3 +242,35 @@ input.txt{text-align:left;font-family:var(--f-body)}
 .calq input{width:100%;text-align:right}
 @media (max-width:520px){.calq{grid-template-columns:1fr 1fr}.calq label{grid-column:1/-1}}
 input.calc{background:transparent;border-style:dashed;color:var(--muted);cursor:default}
+
+/* ---- Grafikler (Elektrik, Ölçüm, Saha) ---- */
+.chart svg{width:100%;height:auto;display:block}
+.chart text{font-size:10.5px;fill:var(--muted);font-family:var(--f-mono)}
+.chart text.ax{fill:var(--muted);font-family:var(--f-body)}
+.chart .gr{stroke:var(--line);stroke-width:.6}
+.chart .ln{fill:none;stroke-width:1.8}
+.chart .dash{stroke-dasharray:4 3}
+.chart .s0{stroke:var(--accent);fill:var(--accent)}.chart .s1{stroke:#0f8a7e;fill:#0f8a7e}.chart .s2{stroke:#b07a12;fill:#b07a12}.chart .s3{stroke:var(--loss);fill:var(--loss)}.chart .s4{stroke:#7c5cc4;fill:#7c5cc4}
+.chart path.ln{fill:none}
+.chart text.lb{font-family:var(--f-body);font-size:10.5px;stroke:none}
+.chart .bar{fill:var(--accent);opacity:.85}.chart .bar.neg{fill:var(--loss)}.chart .lim{stroke:var(--loss);stroke-dasharray:4 3;stroke-width:1}.chart .ctr{stroke:var(--fg);stroke-width:1}
+.chart circle.out{fill:var(--loss);stroke:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .chart .s1{stroke:#3cc0b0;fill:#3cc0b0}:root:not([data-theme="light"]) .chart .s2{stroke:#e0a640;fill:#e0a640}:root:not([data-theme="light"]) .chart .s4{stroke:#a98cf0;fill:#a98cf0}}
+:root[data-theme="dark"] .chart .s1{stroke:#3cc0b0;fill:#3cc0b0}:root[data-theme="dark"] .chart .s2{stroke:#e0a640;fill:#e0a640}:root[data-theme="dark"] .chart .s4{stroke:#a98cf0;fill:#a98cf0}
+/* tornado */
+.tn{display:grid;grid-template-columns:minmax(0,1.4fr) 5.2rem minmax(0,2fr) 5.2rem;gap:4px 8px;align-items:center;font-size:13px}
+.tn .h{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.tn .lbl small{display:block;color:var(--muted);font-size:11px}
+.tn .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;font-size:12px}
+.tn .v.l{text-align:left}
+@media (max-width:520px){.tn{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}.tn .v{display:none}}
+.tnbar{position:relative;height:16px;background:linear-gradient(var(--line),var(--line)) center/1px 100% no-repeat}
+.tnbar span{position:absolute;top:2px;bottom:2px;border-radius:2px}
+.tnbar .lo,.tnk.lo{background:#b07a12}.tnbar .hi,.tnk.hi{background:var(--accent)}
+.tnk{display:inline-block;width:11px;height:9px;border-radius:2px;vertical-align:-1px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tnbar .lo,:root:not([data-theme="light"]) .tnk.lo{background:#e0a640}}
+:root[data-theme="dark"] .tnbar .lo,:root[data-theme="dark"] .tnk.lo{background:#e0a640}
+tr.hit td{background:var(--accent-soft)}
+input.cin{width:6.5em;text-align:right;font-family:var(--f-mono);font-size:12.5px;padding:3px 6px}
+input.cin.txt{width:11em;text-align:left;font-family:var(--f-body)}
+#msMap .grp{margin-top:8px}

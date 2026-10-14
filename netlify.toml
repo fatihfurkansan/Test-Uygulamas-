@@ -2,3 +2,7 @@
 [build]
   publish = "web"
   command = ""
+
+# PVGIS vekili (Saha sekmesi): netlify/functions/pvgis.mjs → /api/pvgis
+[functions]
+  directory = "netlify/functions"

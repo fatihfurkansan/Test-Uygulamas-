@@ -31,8 +31,11 @@
     <button class="tab" role="tab" data-tab="tasarim">Tasarım</button>
     <button class="tab" role="tab" data-tab="cizim">Çizim</button>
     <button class="tab" role="tab" data-tab="ctm">CTM</button>
+    <button class="tab" role="tab" data-tab="elektrik">Elektrik</button>
     <button class="tab" role="tab" data-tab="tolerans">Tolerans</button>
+    <button class="tab" role="tab" data-tab="olcum">Ölçüm</button>
     <button class="tab" role="tab" data-tab="maliyet">Maliyet / BOM</button>
+    <button class="tab" role="tab" data-tab="saha">Saha</button>
     <button class="tab" role="tab" data-tab="kutuphane">Kütüphane</button>
     <button class="tab" role="tab" data-tab="karsilastir">Karşılaştır</button>
     <button class="tab" role="tab" data-tab="kayit">Kayıt</button>
@@ -71,14 +74,21 @@
     <div class="card">
       <div class="cardhead"><h3>Teknik resim</h3><small>A3 yatay · ISO E projeksiyon · ölçüler mm</small></div>
       <div class="sheetbar" id="sheetBar">
-        <div class="seg"><button class="btn sm" data-sheet="1" aria-pressed="true">Pafta 1 · Görünüşler</button><button class="btn sm" data-sheet="2" aria-pressed="false">Pafta 2 · Detay ve elektrik</button></div>
+        <div class="seg"><button class="btn sm" data-sheet="1" aria-pressed="true">Pafta 1 · Görünüşler</button><button class="btn sm" data-sheet="2" aria-pressed="false">Pafta 2 · Detay ve elektrik</button><button class="btn sm" data-sheet="3" aria-pressed="false">Datasheet s.1</button><button class="btn sm" data-sheet="4" aria-pressed="false">Datasheet s.2</button></div>
         <div class="seg"><button class="btn sm" data-zoom="out" aria-label="Uzaklaştır">−</button><span id="zoomLbl" class="mono">100%</span><button class="btn sm" data-zoom="in" aria-label="Yakınlaştır">+</button><button class="btn sm" data-zoom="fit">Sığdır</button></div>
-        <div class="seg"><button class="btn sm" id="svgDl">SVG indir</button><button class="btn sm pri" id="printBtn">Yazdır / PDF</button></div>
+        <div class="seg"><button class="btn sm" id="svgDl">SVG indir</button><button class="btn sm" id="dxfDl">DXF indir</button><button class="btn sm pri" id="printBtn">Yazdır / PDF</button></div>
       </div>
       <div class="sheetwrap" id="sheetBox"></div>
-      <p class="note">Telefonda yakınlaştırmak için + düğmesini veya iki parmakla büyütmeyi kullanın. Yazdır / PDF iki paftayı A3 yatay olarak çıkarır; tarayıcıda "PDF olarak kaydet" seçin. Kırmızı ölçüler sınır ihlalidir.</p>
+      <p class="note">Telefonda yakınlaştırmak için + düğmesini veya iki parmakla büyütmeyi kullanın. Yazdır / PDF, teknik resim seçiliyken iki paftayı A3 yatay, datasheet seçiliyken iki sayfayı A4 dikey olarak çıkarır; tarayıcıda "PDF olarak kaydet" seçin. Kırmızı ölçüler sınır ihlalidir.</p>
     </div>
     <div class="card"><h3>Sınır kontrolleri</h3><div class="viol" id="violBox2"></div></div>
+    <div class="card"><div class="cardhead"><h3>Mekanik yük beyanı</h3><small id="mechStat"></small></div>
+      <div id="inputsLoad"></div>
+      <h3 style="margin-top:14px">Sertifikalı mekanik kapsam</h3>
+      <p class="note">Sertifika raporlarınızdaki cam / çerçeve / montaj kombinasyonlarını ve test yüklerini girin. Tasarım bu tabloyla karşılaştırılır. Kayıtlar bu cihazda saklanır.</p>
+      <div class="tw" id="certTbl"></div>
+      <div class="btns" style="margin-top:8px"><button class="btn sm" id="certAdd">Mevcut tasarımı kapsam olarak ekle</button></div>
+    </div>
     <div id="inputsMech" class="panel"></div>
   </section>
 
@@ -104,6 +114,21 @@
     </div>
   </section>
 
+  <!-- ELEKTRİK -->
+  <section class="panel" data-panel="elektrik" hidden>
+    <div class="card"><div class="cardhead"><h3>Tek diyot elektrik modeli</h3><small id="ivNote"></small></div><div class="stats" id="ivStats"></div></div>
+    <div class="grid2">
+      <div class="card"><h3>I-V eğrileri · 25 °C</h3><div class="chart" id="ivChartG"></div></div>
+      <div class="card"><h3>P-V eğrileri · 1000 W/m²</h3><div class="chart" id="ivChartT"></div></div>
+    </div>
+    <div class="card"><div class="cardhead"><h3>Işınım × sıcaklık matrisi</h3><small>Pmax (W) · IEC 61853-1 koşulları</small></div><div class="tw" id="ivMatrix"></div></div>
+    <div class="card"><div class="cardhead"><h3>Akım ve gerilim kontrolleri</h3><small>J-box, kablo, konnektör, dizi</small></div><div class="tw" id="curTbl"></div>
+      <p class="note">Gereken akım: Isc × (1 + 0,3·φ) × 1,25 (φ: modül bifasiyalliği). Kablo değerleri H1Z2Z2-K serbest havada tipik akım taşıma kapasitesidir; kurulum koşuluna göre azaltılmalıdır.</p></div>
+    <div class="card"><div class="cardhead"><h3>Gölge senaryosu</h3><small>Bypass diyot ve sıcak nokta</small></div>
+      <div class="grid2"><div id="inputsShade"></div><div><div class="stats" id="shStats"></div><div class="chart" id="shChart"></div></div></div></div>
+    <div id="inputsIV" class="panel"></div>
+  </section>
+
   <!-- TOLERANS -->
   <section class="panel" data-panel="tolerans" hidden>
     <div id="inputsMC" class="panel"></div>
@@ -112,6 +137,23 @@
       <p class="note">Ölçü toleransları Tasarım sekmesindeki ± alanlarından alınır. Cam kesilmiş ölçüde sabitlenir. Dizi boyu stringer adım hatasından, dizilerin yanal konumu lay-up hatasından gelir; kenar mesafesini kenar sütundaki en geniş hücre belirler. Cam kesim, lay-up kaçıklığı ve çerçeve montajı ayrı bileşenlerdir. Elektriksel saçılım: proses CTM ve flasher (ölçüm) belirsizliği.</p>
       <div id="mcOut" class="panel" style="margin-top:10px"><p class="note">Hesaplanıyor…</p></div>
     </div>
+    <div class="card">
+      <div class="cardhead"><h3>Hassasiyet analizi</h3>
+        <div class="row wide" style="border:0;padding:0;min-width:220px"><label for="tnMetric">Ölçüt</label><select id="tnMetric"><option value="P">Pmax (W)</option><option value="eta">Modül verimi (%)</option><option value="CTM">CTM (%)</option><option value="perW">Birim maliyet (/W)</option></select></div></div>
+      <p class="note">Her girdi tek başına aşağı ve yukarı değiştirilir, diğerleri sabit tutulur. Değişim aralığı: toleransı olanlarda ± tolerans, diğerlerinde satırda yazan değer. En etkili girdiler üstte.</p>
+      <div id="tornado"></div>
+    </div>
+  </section>
+
+  <!-- ÖLÇÜM -->
+  <section class="panel" data-panel="olcum" hidden>
+    <div class="card">
+      <div class="cardhead"><h3>Flasher verisi</h3><div class="btns"><button class="btn sm" id="msSample">Örnek veri yükle</button><label class="btn sm pri" for="msFile">Dosya yükle (CSV / Excel)</label><input type="file" id="msFile" accept=".csv,.txt,.xlsx,.xls" hidden></div></div>
+      <p class="note">Flasher’ın dışa aktardığı dosyayı yükleyin. Kolonlar adlarına göre otomatik eşleştirilir; aşağıdan düzeltebilirsiniz. Veri yalnız bu oturumda tutulur. Model karşılaştırması, Tasarım sekmesindeki hücre değerlerinin ölçülen modüllerin hücre biniyle aynı olduğunu varsayar.</p>
+      <p class="msg" id="msMsg"></p>
+      <div id="msMap"></div>
+    </div>
+    <div id="msBody" class="panel"></div>
   </section>
 
   <!-- MALİYET -->
@@ -125,6 +167,18 @@
     </div>
     <div id="inputsCost" class="panel"></div>
     </section>
+
+  <!-- SAHA -->
+  <section class="panel" data-panel="saha" hidden>
+    <div class="card">
+      <div class="cardhead"><h3>Konuma göre enerji verimi</h3><small>PVGIS (AB Ortak Araştırma Merkezi)</small></div>
+      <div class="row wide"><label for="siteSel">Hazır konum</label><select id="siteSel"></select></div>
+      <div id="inputsSite"></div>
+      <div class="btns" style="margin-top:10px"><button class="btn pri" id="pvgisRun">PVGIS’ten hesapla</button><small class="note" id="pvgisState"></small></div>
+      <p class="note">PVGIS sorgusu sitenin Netlify sunucu fonksiyonu üzerinden yapılır; çevrimdışıyken son sonuç kullanılır. PVGIS genel kristal silisyum modülü varsayar; bifasiyal kazanç ve sıcaklık katsayısı farkı bu tasarıma göre eklenir.</p>
+    </div>
+    <div id="sahaOut" class="panel"></div>
+  </section>
 
   <!-- KÜTÜPHANE -->
   <section class="panel" data-panel="kutuphane" hidden>
@@ -182,23 +236,37 @@
       <p class="msg" id="dlNote"></p>
     </div>
     <div class="card">
+      <div class="cardhead"><h3>Revizyonlar</h3><small id="revInfo"></small></div>
+      <div class="row wide"><label for="revNote">Değişiklik notu</label><input type="text" id="revNote" class="txt" placeholder="ör. Tel çapı 0,24 → 0,25 mm"></div>
+      <div class="btns" style="margin-top:8px"><button class="btn pri" id="revSave">Revizyon olarak kaydet</button></div>
+      <p class="msg" id="revMsg"></p>
+      <div class="tw" id="revList"></div>
+      <div id="revDiff"></div>
+    </div>
+    <div class="card">
       <div class="cardhead"><h3>JSON</h3><div class="btns"><button class="btn sm" id="jsonShow">Mevcut tasarımı göster</button><button class="btn sm" id="jsonCopy">Kopyala</button><button class="btn sm" id="jsonLoad">Bu JSON'u yükle</button></div></div>
       <textarea id="jsonBox" spellcheck="false" style="min-height:14rem"></textarea>
       <p class="msg" id="jsonMsg"></p>
     </div>
     <div class="card note">
       <h3 style="color:var(--fg)">Model notları</h3>
-      <p>Hesap motoru <span class="mono">assets/js/engine.js</span> dosyasında, arayüzden bağımsızdır. Uygulama çevrimdışı çalışır; veriler yalnız bu cihazda saklanır. Ön yüz STC gücü hesaplanır; bifasiyal arka yüz kazancı modellenmez. Varsayılan katsayılar tipik değerlerdir. Kendi CTM ölçümlerinizle CTM sekmesinden kalibre edin.</p>
+      <p>Hesap motoru <span class="mono">assets/js/engine.js</span> (güç zinciri) ve <span class="mono">assets/js/iv.js</span> (tek diyot modeli) dosyalarındadır, arayüzden bağımsızdır. Uygulama çevrimdışı çalışır; veriler yalnız bu cihazda saklanır (PVGIS sorgusu hariç). Ön yüz STC gücü hesaplanır; bifasiyal kazanç datasheet ve saha hesabına φ ile eklenir. Varsayılan katsayılar tipik değerlerdir. Ölçüm sekmesinde flasher verinizle kalibre edin.</p>
     </div>
   </section>
 </main>
 <dialog id="libDlg" aria-label="Malzeme detayı"><div id="libDlgBody"></div></dialog>
 
 <script src="../assets/js/library.js"></script>
+<script src="../assets/js/iv.js"></script>
 <script src="../assets/js/engine.js"></script>
 <script src="../assets/js/app.js"></script>
 <script src="../assets/js/libview.js"></script>
 <script src="../assets/js/drawing.js"></script>
+<script src="../assets/js/datasheet.js"></script>
+<script src="../assets/js/elec.js"></script>
+<script src="../assets/js/analysis.js"></script>
+<script src="../assets/js/meas.js"></script>
+<script src="../assets/js/saha.js"></script>
 <script src="../assets/js/pwa.js"></script>
 <div id="printBox" class="printbox" aria-hidden="true"></div>
 </body>

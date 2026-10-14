@@ -29,9 +29,12 @@
 ```bash
 npm install -g netlify-cli
 netlify login
-netlify deploy --dir web          # önizleme
-netlify deploy --dir web --prod   # canlı
+netlify deploy --dir web --functions netlify/functions          # önizleme
+netlify deploy --dir web --functions netlify/functions --prod   # canlı
 ```
+
+## PVGIS sunucu fonksiyonu (Saha sekmesi)
+Saha sekmesi, konuma göre enerji verimini AB Ortak Araştırma Merkezi'nin PVGIS servisinden alır. PVGIS tarayıcıdan doğrudan çağrılamadığı için istek `netlify/functions/pvgis.mjs` fonksiyonu üzerinden `/api/pvgis` adresine gider. Fonksiyon, GitHub bağlantılı yayında ve CLI ile `--functions` seçeneğiyle otomatik kurulur; ek ayar, API anahtarı veya paket gerekmez. **Sürükle-bırak yayında fonksiyon kurulmaz**; o durumda Saha sekmesi dışındaki her şey çalışır. Son PVGIS sonucu cihazda saklanır, çevrimdışıyken o kullanılır.
 
 ## Telefona kurulum
 - **Android / Chrome:** `/app/` adresini açın, üstteki **Uygulamayı yükle** düğmesine dokunun.
@@ -47,7 +50,7 @@ Dosyaları değiştirip yeniden yayınlayın. Uygulama açılışta yeni sürüm
 Aynı PWA, https://www.pwabuilder.com ile Google Play (TWA) ve App Store paketlerine dönüştürülebilir. Site adresini girip paketleri indirmeniz yeterli; kod değişikliği gerekmez.
 
 ## Veri ve gizlilik
-Tasarımlar, özel malzemeler ve fiyat listesi tarayıcının yerel deposunda (localStorage) tutulur; sunucuya gönderilmez. Başka cihaza taşımak için **Kayıt ▸ JSON indir** ve **Kütüphane ▸ Kütüphanemi indir** kullanın. Tarayıcı verilerini silmek bu kayıtları da siler.
+Tasarımlar, revizyonlar, sertifikalı mekanik kapsam listesi, özel malzemeler ve fiyat listesi tarayıcının yerel deposunda (localStorage) tutulur; sunucuya gönderilmez. Yüklenen flasher dosyası yalnız açık oturumda bellekte tutulur. Sunucuya giden tek istek Saha sekmesindeki PVGIS sorgusudur (yalnız konum, eğim, azimut ve kayıp oranı). Başka cihaza taşımak için **Kayıt ▸ JSON indir** ve **Kütüphane ▸ Kütüphanemi indir** kullanın. Tarayıcı verilerini silmek bu kayıtları da siler.
 
 ## Yerelde deneme
 ```bash

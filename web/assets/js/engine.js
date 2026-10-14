@@ -133,6 +133,31 @@ const SCHEMA=[
   S_('cvI','ctm','Hücre bini içi Impp saçılımı (CV = σ/ort.)','%',1.5,{min:0,hint:'Yalnız seçenek açıkken: δ = β·CV²'}),
   S_('beta','ctm','Mismatch katsayısı β','–',0.13,{min:0,hint:'Yalnız seçenek açıkken; ölçümle kalibre edin'}),
   S_('kCal','ctm','Kalibrasyon çarpanı k_kal','–',1.000,{min:0.5,max:1.5}),
+  // Elektrik modeli (tek diyot)
+  S_('ivOn','iv','Tek diyot IV modeli','',true,{type:'bool',hint:'Kapalıysa yalnız güç tabanlı CTM zinciri kullanılır'}),
+  S_('RshC','iv','Hücre paralel direnci Rsh (tam hücre)','Ω',0,{min:0,hint:'0 = otomatik: 10 000 Ω·cm² / hücre alanı'}),
+  S_('Vd','iv','Bypass diyot ileri gerilimi','V',0.45,{min:0,max:2}),
+  S_('kOptCal','iv','Optik kalibrasyon çarpanı (akım)','–',1,{min:0.8,max:1.2,hint:'Ölçüm sekmesinde Isc karşılaştırmasından'}),
+  S_('kRes','iv','Seri direnç kalibrasyon çarpanı','–',1,{min:0.1,max:5,hint:'Ölçüm sekmesinde FF karşılaştırmasından'}),
+  // Gölge senaryosu
+  S_('shSub','shade','Gölgeli alt dizi (1 = D1)','no',1,{int:1,min:1,max:20}),
+  S_('shBr','shade','Gölgeli dal','','up',{type:'sel',opts:[['up','Üst yarı (veya tek dal)'],['lo','Alt yarı']]}),
+  S_('shN','shade','Gölgeli hücre parçası sayısı','adet',1,{int:1,min:0,max:200}),
+  S_('shF','shade','Gölgelenme oranı','%',50,{min:0,max:100}),
+  // Mekanik yük beyanı
+  S_('mountV','load','Montaj yöntemi','','holes4',{type:'sel',opts:[['holes4','4 montaj deliği (uzun kenar)'],['clampL4','4 kelepçe, uzun kenar'],['clampL6','6 kelepçe, uzun kenar'],['clampS4','4 kelepçe, kısa kenar'],['trk1p','Tek eksen tracker 1P (iç delikler)']]}),
+  S_('ldPos','load','Tasarım yükü + (kar / basınç)','Pa',3600,{min:0}),
+  S_('ldNeg','load','Tasarım yükü − (rüzgâr emme)','Pa',2400,{min:0}),
+  S_('gmL','load','Güvenlik katsayısı γm','–',1.5,{min:1,hint:'IEC 61215: ≥ 1,5'}),
+  // Saha / enerji (PVGIS)
+  S_('lat','site','Enlem','°',39.93,{min:-90,max:90}),
+  S_('lon','site','Boylam','°',32.86,{min:-180,max:180}),
+  S_('tilt','site','Eğim açısı','°',30,{min:0,max:90}),
+  S_('azim','site','Azimut (0 = güney, −90 = doğu)','°',0,{min:-180,max:180}),
+  S_('mplace','site','Montaj','','free',{type:'sel',opts:[['free','Serbest duran (açık arazi)'],['building','Çatıya entegre / bitişik']]}),
+  S_('sysLoss','site','Sistem kayıpları','%',14,{min:0,max:50,hint:'Kablo, inverter, kirlenme vb. (PVGIS)'}),
+  S_('rearPct','site','Arka yüz ışınım oranı','%',10,{min:0,max:40,hint:'Zemin albedosuna göre; çim ~%7, beton ~%10, beyaz zemin ~%15'}),
+  S_('dTop','site','Ortalama çalışma sıcaklığı farkı (STC üstü)','°C',20,{min:0,max:50,hint:'γ farkının enerjiye etkisi için'}),
   // Monte Carlo
   S_('n','mc','İterasyon sayısı','adet',10000,{int:1,min:100,max:200000}),
   S_('dist','mc','Tolerans dağılımı','','normal',{type:'sel',opts:[['normal','Normal (σ = tol/3)'],['uniform','Düzgün (±tol)']]}),
@@ -151,8 +176,10 @@ const SCHEMA=[
   S_('nPal','cost','Palet başı modül','adet',36,{int:1,min:1}),
   S_('yield','cost','Üretim verimi (yield)','%',99.0,{min:50,max:100,hint:'Hurda/düşük sınıf karşılığı maliyete eklenir'})
 ];
-const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',mech:'Mekanik ve teknik resim',ds:'Datasheet ve saha',cost:'Maliyet ayarları'};
+const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',mech:'Mekanik ve teknik resim',iv:'Elektrik modeli',shade:'Gölge senaryosu',load:'Mekanik yük beyanı',site:'Saha ve enerji',ds:'Datasheet ve saha',cost:'Maliyet ayarları'};
 const SCH=Object.fromEntries(SCHEMA.map(s=>[s.k,s]));
+/* Sertifikalı mekanik kapsam listesi (Ö15) — cihazda saklanır, analysis.js düzenler */
+let MECHCERT=(()=>{try{const v=JSON.parse(localStorage.getItem('pvm.mechcert'));return Array.isArray(v)?v:[];}catch(e){return [];}})();
 
 /* ---- BOM satır tanımları: fiyat birimi, varsayılan fiyat ve fire ---- */
 const BOMDEF=[
@@ -227,6 +254,7 @@ function evaluate(p,light){
   const lOn=Math.max(h-2*p.ov,0);
   const shade=(p.tech==='BC'||p.tech==='MWT')?0:p.nbb*Math.max(p.dw-p.wpad,0)*lOn*(1-rw)/Apiece;
   add('shade','Tel gölgelemesi',1-shade,'opt',(p.tech==='BC'||p.tech==='MWT')?p.tech+' hücre: önde tel yok':'N_bb·(d−w_pad)·ℓ·(1−r_w)/A');
+  if(p.kOptCal!==undefined&&Math.abs(p.kOptCal-1)>1e-9)add('ocal','Optik kalibrasyon (Isc)',p.kOptCal,'opt','k_opt');
   let kI=1;for(const s of steps)if(s.kind==='opt')kI*=s.k;
   const kCut=steps[0].k;
   const P1=Pcells*kCut*kI;
@@ -234,32 +262,42 @@ function evaluate(p,light){
   const Aw=p.wt==='round'?Math.PI*p.dw*p.dw/4:p.wt==='tri'?Math.sqrt(3)/4*p.dw*p.dw:p.dw*p.tr; // mm²
   const Rw=rhoT/(Aw*1e-6);
   const Ipe=Ip*kI,Iw=Ipe/p.nbb;
-  const Pw=N*p.nbb*Iw*Iw*Rw*(2*lOn/3+Math.max(p.gc,0))/1000;
+  const kRes=p.kRes>0?p.kRes:1;
+  const Pw=kRes*N*p.nbb*Iw*Iw*Rw*(2*lOn/3+Math.max(p.gc,0))/1000;
   const Ab=p.bw*p.bt,Rbus=rhoT/(Ab*1e-6);
   const Leq=Np*((nc/2)*p.gs+nc*2*a/3)/1000;
   const Imod=Np*Ipe;
-  const Pbus=Ipe*Ipe*Rbus*Leq+2*Imod*Imod*Rbus*p.lead/1000;
+  const Pbus=kRes*(Ipe*Ipe*Rbus*Leq+2*Imod*Imod*Rbus*p.lead/1000);
   const rhoCab=1.85e-8*(1+0.00393*(p.Tm-20));
   const Rcab=2*rhoCab*(p.cabL/1000)/(p.cabA*1e-6); // Ω
   const Rjt=Rcab+(p.Rj+p.conR)/1000;
-  const Pj=Imod*Imod*Rjt;
+  const Pj=kRes*Imod*Imod*Rjt;
   add('rw','Tel / ara bağlantı direnç kaybı',1-Pw/P1,'res','N·N_bb·I_w²·R′·(2ℓ/3 + g)');
   add('rb','Bus ribbon direnç kaybı',1-Pbus/P1,'res','I²·R′_bus·L_eş');
   add('rj','J-box, kablo, konnektör kaybı',1-Pj/P1,'res','I_mod²·(R_kablo + R_term + R_kon)');
-  const dmm=p.mmMode?p.beta*p.cvI*p.cvI:p.dMM;
-  add('mm','Mismatch',1-dmm/100,'loss',p.mmMode?'β·CV²':'girilen değer');
+  const ivUse=!light&&p.ivOn!==false&&typeof moduleIV==='function';
+  const Rpre={half,nc,nr,up,lo,kILiv:kCut*kI,Rext:(Pw+Pbus+Pj)/(Imod*Imod)};
+  let dmm=p.mmMode?p.beta*p.cvI*p.cvI:p.dMM,mmNote=p.mmMode?'β·CV²':'girilen değer',spec0=null;
+  if(ivUse){spec0=ivSpec(p,Rpre);
+    if(spec0&&p.mmMode&&p.cvI>0){const P0=moduleIV(spec0).Pmp;let s=0;for(const sd of [11,23,37,51])s+=moduleIV(Object.assign({},spec0,{cv:p.cvI,seed:sd})).Pmp;dmm=(1-s/4/P0)*100;mmNote=`IV simülasyonu, Impp CV %${f(p.cvI,1)}`;}}
+  add('mm','Mismatch',1-dmm/100,'loss',mmNote);
   add('cal','Kalibrasyon çarpanı',p.kCal,'cal','k_kal');
+  let Pch=Pcells;for(const s of steps)Pch*=s.k;
+  let iv=null,spec=null;
+  if(spec0){spec=Object.assign({},spec0,{kIL:kCut*kI*(1-dmm/100)*p.kCal});iv=moduleIV(spec);
+    add('iv','Elektrik modeli farkı (IV eğrisi)',iv.Pmp/Pch,'iv','tek diyot modeli ↔ güç zinciri');}
   let P=Pcells;for(const s of steps){s.P0=P;P*=s.k;s.P1=P;s.dW=s.P1-s.P0;s.dPct=(s.k-1)*100;}
-  const Voc=Ns*p.Voc,Isc=Np*Iscp*kI,Imp=Imod,Vmp=P/Imp,FF=P/(Voc*Isc);
+  const Voc=iv?iv.Voc:Ns*p.Voc,Isc=iv?iv.Isc:Np*Iscp*kI,Imp=iv?iv.Imp:Imod,Vmp=P/Imp,FF=P/(Voc*Isc);
   const eta=P/(Amod/1e6*10),etaG=P/(Aglass/1e6*10);
-  const R={Pc,half,Np,Ns,N,Nfull,nc,nr,up,lo,h,nGapCol,gmUse,blockL,blockW,Lg,Wg,L,W,fc,Apiece,Acells,Amod,Aglass,
+  const R={Pc,Pchain:Pch,iv,ivSpec:spec,Rext:Rpre.Rext,kILiv:spec?spec.kIL:kCut*kI,half,Np,Ns,N,Nfull,nc,nr,up,lo,h,nGapCol,gmUse,blockL,blockW,Lg,Wg,L,W,fc,Apiece,Acells,Amod,Aglass,
     AAR:Acells/Amod*100,Pcells,steps,P,CTM:P/Pcells*100,eta,etaG,Voc,Isc,Imp,Vmp,FF,kI,Agap,Pw,Pbus,Pj,Rw,Rbus,Rjt,Rcab,Iw,Ipe,Imod,lOn,Aw,Ab,dmm};
   if(light)return R;
   // datasheet: sıcaklık, bifasiyal, garanti
   const rr=LIB.rear.items[p.rearV]||{},er=LIB.enc.items[p.encRV]||{};
   const tau=(rr.tau||0)*(er.rb!==undefined?0:1);
   const phi=p.bif*tau*(1-shade);
-  const ds={phi,P_NMOT:P*0.8*(1+p.tc/100*(p.NMOT-25)),P_BNPI:P*(1+phi*p.Grear/1000),P_b10:P*(1+phi*0.10),P_b20:P*(1+phi*0.20),P_b30:P*(1+phi*0.30),
+  const P_NMOT=spec?moduleIV(Object.assign({},spec,{G:800,Tc:p.NMOT})).Pmp:P*0.8*(1+p.tc/100*(p.NMOT-25));
+  const ds={phi,P_NMOT,P_BNPI:P*(1+phi*p.Grear/1000),P_b10:P*(1+phi*0.10),P_b20:P*(1+phi*0.20),P_b30:P*(1+phi*0.30),
     y1:100-p.lid,yN:100-p.lid-(p.yrs-1)*p.ann,agG:p.ag*Pcells/1000,Voc_m10:Voc*(1+p.bVoc/100*(-10-25))};
   R.ds=ds;
   // ağırlık
@@ -296,6 +334,21 @@ function evaluate(p,light){
   if(p.frameV!=='none'&&p.fOv>=Math.min(p.eW,p.eL))V.push({id:'fOv',m:`Çerçeve dudağı (${f(p.fOv,1)} mm) hücreye kadar uzanıyor; kenar mesafesinden küçük olmalı`});
   if(p.frameV==='none'&&rear.kind==='bs')V.push({id:'fr',m:'Backsheet’li modül çerçevesiz olamaz'});
   if((LIB.enc.items[p.encFV]||{}).white)V.push({id:'enc',m:'Beyaz enkapsülan ön yüzde kullanılamaz'});
+  // Ö2: J-box/diyot, kablo, konnektör akım kontrolü — Isc·(1 + 0,3·φ)·1,25
+  {const jb=LIB.jbox.items[p.jboxV]||{},cb=LIB.cable.items[p.cableV]||{},cn=LIB.conn.items[p.connV]||{};
+   const Ireq=R.Isc*(1+0.3*ds.phi)*1.25;
+   R.cur={Ireq,jb:jb.Irat,cab:cb.Iz,con:cn.Irat,fuse:Math.ceil(R.Isc*1.56/5)*5};
+   if(jb.Irat&&jb.Irat<Ireq)V.push({id:'jbI',m:`J-box/bypass diyot anma akımı ${f(jb.Irat,0)} A < gereken ${f(Ireq,1)} A (Isc·(1+0,3·φ)·1,25)`});
+   if(cb.Iz&&cb.Iz<Ireq)V.push({id:'cabI',m:`Kablo akım taşıma kapasitesi ${f(cb.Iz,0)} A < gereken ${f(Ireq,1)} A`});
+   if(cn.Irat&&cn.Irat<Ireq)V.push({id:'conI',m:`Konnektör anma akımı ${f(cn.Irat,0)} A < gereken ${f(Ireq,1)} A`});}
+  // Ö15: mekanik yük beyanı ve sertifika kapsamı
+  {const tp=p.ldPos*p.gmL,tn=p.ldNeg*p.gmL,certs=Array.isArray(MECHCERT)?MECHCERT:[];
+   const match=certs.find(e=>e.frameV===p.frameV&&Math.abs(e.tgf-p.tgf)<0.01&&e.rearV===p.rearV&&e.mountV===p.mountV)||null;
+   R.mech={tp,tn,match,status:match?(tp<=match.maxPos&&tn<=match.maxNeg?'ok':'over'):'none'};
+   if(p.ldPos<1600||p.ldNeg<1600)V.push({id:'load',m:`Tasarım yükü IEC 61215 alt sınırının (1600 Pa) altında`});
+   if(p.gmL<1.5)V.push({id:'load',m:`Güvenlik katsayısı γm ${f(p.gmL,2)} < 1,5`});
+   if(match&&R.mech.status==='over')V.push({id:'load',m:`Test yükü +${f(tp,0)}/−${f(tn,0)} Pa sertifikalı kapsamı (+${f(match.maxPos,0)}/−${f(match.maxNeg,0)} Pa) aşıyor`});}
+  if(R.iv&&R.ivSpec&&R.ivSpec.full&&!R.ivSpec.full.ok)V.push({id:'Vmp',m:`Hücre Vmpp/Impp noktası tek diyot modeliyle tam uyuşmuyor (Pmax hatası %${f(R.ivSpec.full.errP,2)}); Impp/Isc ve Vmpp/Voc değerlerini kontrol edin`});
   R.viol=V;R.bad=new Set(V.map(v=>v.id));
   R.bom=bom(p,R);
   return R;
@@ -371,6 +424,7 @@ function runMC(p,tol){
   const sdT=t=>t>0?(uni?t/Math.sqrt(3):t/3):0;
   const dev=t=>t>0?(uni?(rng()*2-1)*t:gauss()*t/3):0;
   const R0=evaluate(p,true);
+  const RF=evaluate(p),ivRatio=RF.P/R0.P;
   const nc=R0.nc,nr=R0.nr,ng=R0.nGapCol;
   const P=new Float64Array(n),E=new Float64Array(n),Ls=new Float64Array(n),Ws=new Float64Array(n),eS=new Float64Array(n),eB=new Float64Array(n);
   let vE=0,vB=0,vL=0,vW=0,vP=0,vAny=0;
@@ -390,7 +444,7 @@ function runMC(p,tol){
     q.tgf=p.tgf+dev(T('tgf'));q.tgr=p.tgr+dev(T('tgr'));q.dw=p.dw+dev(T('dw'));
     const r=evaluate(q,true);
     const Lm=r.L+dev(p.fT),Wm=r.W+dev(p.fT);
-    const Pi=r.P*(1+gauss()*p.sCTM/100)*(1+gauss()*p.sMeas/100);
+    const Pi=r.P*ivRatio*(1+gauss()*p.sCTM/100)*(1+gauss()*p.sMeas/100);
     const es=Math.min(eLeft,eRight),eb=Math.min(eL+oy,eL-oy)-p.bg-p.bw;
     P[i]=Pi;E[i]=Pi/(Lm*Wm/1e6*10);Ls[i]=Lm;Ws[i]=Wm;eS[i]=es;eB[i]=eb;
     const a1=es<p.eMin,a2=eb<p.eMin,a3=Lm>p.Lmax,a4=Wm>p.Wmax,a5=Pi<p.Pplate;

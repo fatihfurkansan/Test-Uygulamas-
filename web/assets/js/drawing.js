@@ -264,7 +264,8 @@ function sheet2(){
   // HÜCRE DETAYI
   o+=cellDetail(16,128,160,100);
   // ELEKTRİK ŞEMASI
-  o+=schematic(186,128,218,100);
+  o+=schematic(186,128,218,78);
+  o+=revBlock(282,208,124,22);
   // ELEKTRİKSEL DEĞERLER
   o+=elecTable(16,238,258,46);
   o+=titleBlock(282,232,124,51,2);
@@ -321,6 +322,18 @@ function schematic(x,y,bw,bh){
   o+=t(x,y+bh-1,1.8,'Normal çalışmada diyotlar ters kutuplu; gölgelenen alt diziyi köprüler. Kesikli çerçeve: J-box.',{c:'mut'});
   return o;
 }
+/* Revizyon tablosu (Ö8): bu çizim numarasının son kayıtları */
+function revBlock(x,y,w,h){
+  const p=S.p,all=(typeof REVS!=='undefined'?REVS:[]).filter(r=>r.dwg===(p.dwgNo||'')),rows=all.slice(-3);
+  let o=t(x,y-1,2.4,'REVİZYONLAR',{w:700})+rc(x,y,w,h,'tb');
+  const rh=h/4,cx=[x,x+10,x+30,x+w-22,x+w];
+  o+=t(cx[0]+1.2,y+rh-1.3,1.8,'Rev.',{w:600})+t(cx[1]+1.2,y+rh-1.3,1.8,'Tarih',{w:600})+t(cx[2]+1.2,y+rh-1.3,1.8,'Açıklama',{w:600})+t(cx[3]+1.2,y+rh-1.3,1.8,'Çizen',{w:600});
+  for(const c of cx.slice(1,4))o+=ln(c,y,c,y+h,'tl');
+  for(let i=1;i<4;i++)o+=ln(x,y+rh*i,x+w,y+rh*i,'tl');
+  if(!rows.length)o+=t(cx[0]+1.2,y+2*rh-1.3,1.9,p.rev||'A')+t(cx[2]+1.2,y+2*rh-1.3,1.8,'Kayıtlı revizyon yok (Kayıt sekmesi)',{c:'mut'});
+  rows.forEach((r,i)=>{const yy=y+rh*(i+2)-1.3;o+=t(cx[0]+1.2,yy,1.9,r.rev,{w:600})+t(cx[1]+1.2,yy,1.7,new Date(r.date).toLocaleDateString('tr-TR'))+t(cx[2]+1.2,yy,1.7,clip(r.note||'',40))+t(cx[3]+1.2,yy,1.7,clip(r.by||'—',12));});
+  return o;
+}
 function elecTable(x,y,w,h){
   const p=S.p,d=R.ds,fuse=Math.ceil(R.Isc*1.56/5)*5;
   const rows=[['Pmax (STC)',f(R.P,1)+' W'],['Voc',f(R.Voc,2)+' V'],['Isc',f(R.Isc,2)+' A'],['Vmp',f(R.Vmp,2)+' V'],['Imp',f(R.Imp,2)+' A'],['Modül verimi',f(R.eta,2)+' %'],
@@ -334,6 +347,7 @@ function elecTable(x,y,w,h){
 
 /* ---------- Pafta kabuğu ---------- */
 function sheetSVG(n){
+  if(n>2&&window.dsSheetSVG)return dsSheetSVG(n-2);
   const body=n===1?sheet1():sheet2();
   return `<svg class="sheet" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SHEET.w} ${SHEET.h}" role="img" aria-label="Teknik resim pafta ${n}">
 <style>${SHEET_CSS}</style><rect class="paper" x="0" y="0" width="${SHEET.w}" height="${SHEET.h}"/>
@@ -365,18 +379,73 @@ const HATCH=`<defs><pattern id="hatch" width="1.6" height="1.6" patternUnits="us
 function renderSheets(){
   const box=$('#sheetBox');if(!box||!R)return;
   const svg=sheetSVG(SHEET_N).replace('<rect class="paper"',HATCH+'<rect class="paper"');
-  box.innerHTML=svg;box.querySelector('svg').style.width=(SHEET_Z*100)+'%';
+  box.innerHTML=svg;const sv=box.querySelector('svg');sv.style.width=(SHEET_Z*100)+'%';if(SHEET_N>2){sv.style.maxWidth=(SHEET_Z*760)+'px';sv.style.margin='0 auto';}
   for(const b of $$('[data-sheet]'))b.setAttribute('aria-pressed',String(+b.dataset.sheet===SHEET_N));
   $('#zoomLbl').textContent=Math.round(SHEET_Z*100)+'%';
 }
 function sheetFile(n){return '<?xml version="1.0" encoding="UTF-8"?>\n'+sheetSVG(n).replace('<rect class="paper"',HATCH+'<rect class="paper"');}
+/* ---------- DXF (R12, AC1009) — Ö10 ----------
+   Model mm, Y yukarı. Ön görünüş (0,0)–(L,W); arka görünüş altında, arkadan bakış (ayna).
+   Katmanlar: CERCEVE, CAM, HUCRE, TEL, BUS, DELIK, JBOX, OLCU, YAZI. */
+function dxfFile(){
+  const g=G(),p=g.p,E=[],L0=g.L,W0=g.W;
+  const asc=s=>String(s).replace(/[çğıöşüÇĞİÖŞÜ]/g,c=>TRMAP[c]).replace(/°/g,'%%d').replace(/±/g,'%%p').replace(/Ø/g,'%%c').replace(/×/g,'x').replace(/·/g,'-').replace(/[^\x20-\x7E]/g,'');
+  const n=v=>(Math.round(v*1e4)/1e4).toString();
+  const line=(ly,x1,y1,x2,y2)=>E.push(`0\nLINE\n8\n${ly}\n10\n${n(x1)}\n20\n${n(y1)}\n30\n0\n11\n${n(x2)}\n21\n${n(y2)}\n31\n0`);
+  const poly=(ly,pts,closed=true)=>{let s=`0\nPOLYLINE\n8\n${ly}\n66\n1\n10\n0\n20\n0\n30\n0\n70\n${closed?1:0}`;
+    for(const q of pts)s+=`\n0\nVERTEX\n8\n${ly}\n10\n${n(q[0])}\n20\n${n(q[1])}\n30\n0${q[2]?`\n42\n${n(q[2])}`:''}`;E.push(s+`\n0\nSEQEND\n8\n${ly}`);};
+  const rect=(ly,x,y,w,h)=>poly(ly,[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
+  const circ=(ly,x,y,r)=>E.push(`0\nCIRCLE\n8\n${ly}\n10\n${n(x)}\n20\n${n(y)}\n30\n0\n40\n${n(r)}`);
+  const text=(ly,x,y,h,s,al=0,rot=0)=>E.push(`0\nTEXT\n8\n${ly}\n10\n${n(x)}\n20\n${n(y)}\n30\n0\n40\n${n(h)}\n1\n${asc(s)}${rot?`\n50\n${rot}`:''}${al?`\n72\n${al}\n11\n${n(x)}\n21\n${n(y)}\n31\n0`:''}`);
+  // oval delik: saat yönü tersine köşeler; bulge 1 = dışa doğru yarım daire
+  const slot=(ly,x,y,len,wid)=>{const a=Math.max(len-wid,0)/2,r=wid/2;poly(ly,[[x-a,y-r],[x+a,y-r,1],[x+a,y+r],[x-a,y+r,1]]);};
+  const dimH=(x1,x2,y,yt,s)=>{line('OLCU',x1,y,x1,yt);line('OLCU',x2,y,x2,yt);line('OLCU',x1,yt,x2,yt);text('OLCU',(x1+x2)/2,yt+4,8,s,1);};
+  const dimV=(y1,y2,x,xt,s)=>{line('OLCU',x,y1,xt,y1);line('OLCU',x,y2,xt,y2);line('OLCU',xt,y1,xt,y2);text('OLCU',xt-4,(y1+y2)/2,8,s,1,90);};
+  // --- ön görünüş: x = u, y = W − v
+  const F=(u,v)=>[u,W0-v];
+  if(g.fc>0){rect('CERCEVE',0,0,L0,W0);const o=g.fc+p.fOv;rect('CERCEVE',o,o,L0-2*o,W0-2*o);}
+  rect('CAM',g.fc,g.fc,g.Lg,g.Wg);
+  const h=R.h,c=p.ch>0?Math.min(p.ch,p.a/2,h/2):0;
+  for(let j=0;j<R.nc;j++)for(let i=0;i<R.nr;i++){const u=g.rowU(i),v=g.colV(j),u2=u+h,v2=v+p.a;
+    const lt=!R.half||i%2===0?c:0,rt=!R.half||i%2===1?c:0;
+    const pts=c?[[u+lt,v],[u2-rt,v],[u2,v+rt],[u2,v2-rt],[u2-rt,v2],[u+lt,v2],[u,v2-lt],[u,v+lt]]:[[u,v],[u2,v],[u2,v2],[u,v2]];
+    poly('HUCRE',pts.map(q=>F(q[0],q[1])));}
+  if(p.tech!=='BC'&&p.tech!=='MWT'){const segs=R.half&&R.lo>0?[[g.rowU(0),g.rowU(R.up-1)+h],[g.rowU(R.up),g.rowU(R.nr-1)+h]]:[[g.rowU(0),g.rowU(R.nr-1)+h]],pitch=p.a/p.nbb;
+    for(let j=0;j<R.nc;j++)for(let q=0;q<p.nbb;q++){const v=g.colV(j)+pitch*(q+0.5);for(const [u1,u2] of segs){const A=F(u1+p.ov,v),B=F(u2-p.ov,v);line('TEL',A[0],A[1],B[0],B[1]);}}}
+  for(const ub of [g.U0-p.bg-p.bw,g.U0+R.blockL+p.bg]){const [x,y]=F(ub,g.V0+R.blockW);rect('BUS',x,y,p.bw,R.blockW);}
+  dimH(0,L0,W0,W0+40,`${f(L0,1)} %%p${f(p.gT+(g.fc>0?p.fT:0),1)}`);dimV(0,W0,0,-40,`${f(W0,1)} %%p${f(p.gT+(g.fc>0?p.fT:0),1)}`);
+  dimH(g.fc,g.fc+g.Lg,W0,W0+20,`cam ${f(g.Lg,1)}`);
+  text('YAZI',0,W0+70,14,'ON GORUNUS');
+  // --- arka görünüş: arkadan bakış, x = L − u, y = −(W + 250) + (W − v)
+  const oy=-(W0+250),B=(u,v)=>[L0-u,oy+W0-v];
+  if(g.fc>0){rect('CERCEVE',0,oy,L0,W0);const fl=Math.max(p.fFl,g.fc);rect('CERCEVE',fl,oy+fl,L0-2*fl,W0-2*fl);}else rect('CAM',0,oy,L0,W0);
+  const holes=[];if(g.fc>0)for(const m of [p.mh1,p.mh2])if(m>0&&m<L0)for(const sg of [-1,1])holes.push(L0/2+sg*m/2);
+  for(const u of holes)for(const v of [p.fFl/2,W0-p.fFl/2]){const [x,y]=B(u,v);slot('DELIK',x,y,p.mhL,p.mhW);}
+  if(g.fc>0)for(const u of [L0/2-Math.max(p.mh1,p.mh2)/2-60,L0/2+Math.max(p.mh1,p.mh2)/2+60])if(u>0&&u<L0){const [x,y]=B(u,p.fFl/2);circ('DELIK',x,y,p.gh/2);}
+  for(const b of jbPos()){const [x,y]=B(b.u,b.v);rect('JBOX',x-p.jbL/2,y-p.jbW/2,p.jbL,p.jbW);}
+  {const lu=L0*0.82,[x,y]=B(lu,W0/2);rect('YAZI',x-p.lblW/2,y-p.lblH/2,p.lblW,p.lblH);text('YAZI',x,y,8,'ETIKET',2);}
+  if(holes.length){const hs=[...holes].sort((a,b)=>a-b);dimH(L0-hs[hs.length-1],L0-hs[0],oy+W0,oy+W0+30,`${f(Math.max(p.mh1,p.mh2),0)} (montaj)`);}
+  text('YAZI',0,oy+W0+70,14,'ARKA GORUNUS (arkadan bakis)');
+  // --- antet bilgisi
+  const ty=oy-60;text('YAZI',0,ty,12,`${S.name} · ${p.dwgNo||''} rev. ${p.rev||''}`);
+  text('YAZI',0,ty-20,8,`${R.N} parca · ${R.nc}x${R.nr}${R.half?' yarim hucre':''} · Pmax ${f(R.P,1)} W · ${f(R.mass.total,1)} kg · birim mm · ${new Date().toLocaleDateString('tr-TR')}`);
+  const layers=[['CERCEVE',8],['CAM',4],['HUCRE',5],['TEL',9],['BUS',1],['DELIK',2],['JBOX',6],['OLCU',3],['YAZI',7]];
+  const head=`0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSBASE\n10\n0\n20\n0\n30\n0\n9\n$EXTMIN\n10\n-60\n20\n${n(ty-40)}\n30\n0\n9\n$EXTMAX\n10\n${n(L0+20)}\n20\n${n(W0+90)}\n30\n0\n0\nENDSEC`;
+  const tables=`0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n${layers.length}\n`+
+    layers.map(([nm,col])=>`0\nLAYER\n2\n${nm}\n70\n0\n62\n${col}\n6\nCONTINUOUS`).join('\n')+`\n0\nENDTAB\n0\nENDSEC`;
+  return [head,tables,'0\nSECTION\n2\nENTITIES',...E,'0\nENDSEC\n0\nEOF'].join('\n').replace(/\n/g,'\r\n')+'\r\n';
+}
 function initSheets(){
   if(!$('#sheetBox'))return;
   $('#sheetBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
     if(b.dataset.sheet){SHEET_N=+b.dataset.sheet;renderSheets();}
     if(b.dataset.zoom){const z=b.dataset.zoom;SHEET_Z=z==='fit'?1:Math.min(6,Math.max(1,SHEET_Z*(z==='in'?1.5:1/1.5)));renderSheets();}
-    if(b.id==='svgDl')saveFile(`${safeName()}_pafta${SHEET_N}.svg`,sheetFile(SHEET_N));
-    if(b.id==='printBtn'){const pb=$('#printBox');pb.innerHTML=[1,2].map(n=>`<div class="printpage">${sheetFile(n).replace(/^<\?xml[^>]*>\s*/,'')}</div>`).join('');window.print();}
+    if(b.id==='svgDl')saveFile(`${safeName()}_${SHEET_N>2?'datasheet'+(SHEET_N-2):'pafta'+SHEET_N}.svg`,sheetFile(SHEET_N));
+    if(b.id==='dxfDl')saveFile(`${safeName()}.dxf`,dxfFile());
+    if(b.id==='printBtn'){const ds=SHEET_N>2,pb=$('#printBox'),pages=ds?[3,4]:[1,2];
+      let st=$('#pageStyle');if(!st){st=document.createElement('style');st.id='pageStyle';document.head.appendChild(st);}
+      st.textContent=`@media print{@page{size:${ds?'A4 portrait':'A3 landscape'};margin:0}}`;
+      pb.innerHTML=pages.map(n=>`<div class="printpage${ds?' a4':''}">${sheetFile(n).replace(/^<\?xml[^>]*>\s*/,'')}</div>`).join('');window.print();}
   });
 }
 initSheets();
