@@ -149,6 +149,15 @@ const SCHEMA=[
   S_('ldPos','load','Tasarım yükü + (kar / basınç)','Pa',3600,{min:0}),
   S_('ldNeg','load','Tasarım yükü − (rüzgâr emme)','Pa',2400,{min:0}),
   S_('gmL','load','Güvenlik katsayısı γm','–',1.5,{min:1,hint:'IEC 61215: ≥ 1,5'}),
+  S_('clS','load','Destek aralığı (aynı kenarda)','mm',0,{min:0,hint:'0 = otomatik: delik/uzun kenar kelepçesi = montaj deliği aralığı 1, tracker = aralık 2, kısa kenar = genişlik/2'}),
+  // Mekanik model (simülasyon)
+  S_('Gint','mload','Enkapsülan kayma modülü G','MPa',2,{min:0,hint:'25 °C, saatlik yük; EVA ≈ 3, POE ≈ 1,5–2. Cam-cam laminatın ortak çalışmasını belirler'}),
+  S_('kSil','mload','Cam–çerçeve bağı kayma rijitliği','N/mm²',5,{min:0,hint:'Silikon ≈ 2–10, bant ≈ 2–5; 0 = bağ yok (cam ve çerçeve ayrı çalışır)'}),
+  S_('fIx','mload','Çerçeve atalet momenti Ix','cm⁴',0,{min:0,hint:'0 = profil ölçülerinden tahmin; tedarikçi çiziminden girin'}),
+  S_('fRp','mload','Çerçeve akma dayanımı Rp0,2','MPa',0,{min:0,hint:'0 = alaşımdan: 6063-T5 130, 6005-T6 225 MPa'}),
+  S_('fgk','mload','Cam karakteristik eğilme dayanımı','MPa',0,{min:0,hint:'0 = otomatik: tam temperli 120, yarı temperli 70 MPa'}),
+  S_('kRot','mload','Cam kenarı dönme rijitliği (çerçeve kanalı)','N·mm/mm/rad',0,{min:0,hint:'0 = basit mesnet (güvenli taraf). Ölçülen sehimle aşağıdan kalibre edin'}),
+  S_('mDeg','mload','Çözüm polinom derecesi','–',8,{int:1,min:6,max:14,hint:'8: hızlı (±%1), 10–12: daha hassas, daha yavaş'}),
   // Saha / enerji (PVGIS)
   S_('lat','site','Enlem','°',39.93,{min:-90,max:90}),
   S_('lon','site','Boylam','°',32.86,{min:-180,max:180}),
@@ -176,7 +185,7 @@ const SCHEMA=[
   S_('nPal','cost','Palet başı modül','adet',36,{int:1,min:1}),
   S_('yield','cost','Üretim verimi (yield)','%',99.0,{min:50,max:100,hint:'Hurda/düşük sınıf karşılığı maliyete eklenir'})
 ];
-const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',mech:'Mekanik ve teknik resim',iv:'Elektrik modeli',shade:'Gölge senaryosu',load:'Mekanik yük beyanı',site:'Saha ve enerji',ds:'Datasheet ve saha',cost:'Maliyet ayarları'};
+const GROUPS={cell:'Hücre',lay:'Dizilim ve aralıklar',int:'Hücre bağlantısı',mat:'Cam ve katmanlar',fr:'Çerçeve ve J-box',lim:'Sınırlar',ctm:'CTM katsayıları',mc:'Monte Carlo ayarları',mech:'Mekanik ve teknik resim',iv:'Elektrik modeli',shade:'Gölge senaryosu',load:'Mekanik yük beyanı',mload:'Mekanik model ve malzeme',site:'Saha ve enerji',ds:'Datasheet ve saha',cost:'Maliyet ayarları'};
 const SCH=Object.fromEntries(SCHEMA.map(s=>[s.k,s]));
 /* Sertifikalı mekanik kapsam listesi (Ö15) — cihazda saklanır, analysis.js düzenler */
 let MECHCERT=(()=>{try{const v=JSON.parse(localStorage.getItem('pvm.mechcert'));return Array.isArray(v)?v:[];}catch(e){return [];}})();
@@ -251,9 +260,11 @@ function evaluate(p,light){
   const Agap=Math.max(Agint,0)+Aedge;
   add('gap','Gap geri yansıma kazancı',1+p.Rb*p.fy*Agap/Acells,'opt','1 + R_arka·f_yak·A_gap/A_hücre');
   const rw=p.wt==='round'?p.rwR:p.wt==='tri'?p.rwT:p.wt==='struct'?p.rwS:p.rwF;
-  const lOn=Math.max(h-2*p.ov,0);
-  const shade=(p.tech==='BC'||p.tech==='MWT')?0:p.nbb*Math.max(p.dw-p.wpad,0)*lOn*(1-rw)/Apiece;
-  add('shade','Tel gölgelemesi',1-shade,'opt',(p.tech==='BC'||p.tech==='MWT')?p.tech+' hücre: önde tel yok':'N_bb·(d−w_pad)·ℓ·(1−r_w)/A');
+  // Tel hücre önünde uzak kenardan ov içeride başlar, yakın kenardan boşluğu geçip sonraki hücrenin arkasına iner.
+  // Akım toplama bölgesi ℓ = h − 2·ov; tam akım taşıyan bölüm ov + g + ov; gölge boyu h − ov.
+  const lOn=Math.max(h-2*p.ov,0),lSh=Math.max(h-p.ov,0);
+  const shade=(p.tech==='BC'||p.tech==='MWT')?0:p.nbb*Math.max(p.dw-p.wpad,0)*lSh*(1-rw)/Apiece;
+  add('shade','Tel gölgelemesi',1-shade,'opt',(p.tech==='BC'||p.tech==='MWT')?p.tech+' hücre: önde tel yok':'N_bb·(d−w_pad)·(h−ov)·(1−r_w)/A');
   if(p.kOptCal!==undefined&&Math.abs(p.kOptCal-1)>1e-9)add('ocal','Optik kalibrasyon (Isc)',p.kOptCal,'opt','k_opt');
   let kI=1;for(const s of steps)if(s.kind==='opt')kI*=s.k;
   const kCut=steps[0].k;
@@ -263,7 +274,7 @@ function evaluate(p,light){
   const Rw=rhoT/(Aw*1e-6);
   const Ipe=Ip*kI,Iw=Ipe/p.nbb;
   const kRes=p.kRes>0?p.kRes:1;
-  const Pw=kRes*N*p.nbb*Iw*Iw*Rw*(2*lOn/3+Math.max(p.gc,0))/1000;
+  const Pw=kRes*N*p.nbb*Iw*Iw*Rw*(2*lOn/3+Math.max(p.gc,0)+2*p.ov)/1000;
   const Ab=p.bw*p.bt,Rbus=rhoT/(Ab*1e-6);
   const Leq=Np*((nc/2)*p.gs+nc*2*a/3)/1000;
   const Imod=Np*Ipe;
@@ -272,7 +283,7 @@ function evaluate(p,light){
   const Rcab=2*rhoCab*(p.cabL/1000)/(p.cabA*1e-6); // Ω
   const Rjt=Rcab+(p.Rj+p.conR)/1000;
   const Pj=kRes*Imod*Imod*Rjt;
-  add('rw','Tel / ara bağlantı direnç kaybı',1-Pw/P1,'res','N·N_bb·I_w²·R′·(2ℓ/3 + g)');
+  add('rw','Tel / ara bağlantı direnç kaybı',1-Pw/P1,'res','N·N_bb·I_w²·R′·(2ℓ/3 + g + 2·ov)');
   add('rb','Bus ribbon direnç kaybı',1-Pbus/P1,'res','I²·R′_bus·L_eş');
   add('rj','J-box, kablo, konnektör kaybı',1-Pj/P1,'res','I_mod²·(R_kablo + R_term + R_kon)');
   const ivUse=!light&&p.ivOn!==false&&typeof moduleIV==='function';
@@ -284,13 +295,13 @@ function evaluate(p,light){
   add('cal','Kalibrasyon çarpanı',p.kCal,'cal','k_kal');
   let Pch=Pcells;for(const s of steps)Pch*=s.k;
   let iv=null,spec=null;
-  if(spec0){spec=Object.assign({},spec0,{kIL:kCut*kI*(1-dmm/100)*p.kCal});iv=moduleIV(spec);
+  if(spec0){spec=Object.assign({},spec0,{kIL:kCut*kI*(1-dmm/100),kV:p.kCal});iv=moduleIV(spec);
     add('iv','Elektrik modeli farkı (IV eğrisi)',iv.Pmp/Pch,'iv','tek diyot modeli ↔ güç zinciri');}
   let P=Pcells;for(const s of steps){s.P0=P;P*=s.k;s.P1=P;s.dW=s.P1-s.P0;s.dPct=(s.k-1)*100;}
   const Voc=iv?iv.Voc:Ns*p.Voc,Isc=iv?iv.Isc:Np*Iscp*kI,Imp=iv?iv.Imp:Imod,Vmp=P/Imp,FF=P/(Voc*Isc);
   const eta=P/(Amod/1e6*10),etaG=P/(Aglass/1e6*10);
   const R={Pc,Pchain:Pch,iv,ivSpec:spec,Rext:Rpre.Rext,kILiv:spec?spec.kIL:kCut*kI,half,Np,Ns,N,Nfull,nc,nr,up,lo,h,nGapCol,gmUse,blockL,blockW,Lg,Wg,L,W,fc,Apiece,Acells,Amod,Aglass,
-    AAR:Acells/Amod*100,Pcells,steps,P,CTM:P/Pcells*100,eta,etaG,Voc,Isc,Imp,Vmp,FF,kI,Agap,Pw,Pbus,Pj,Rw,Rbus,Rjt,Rcab,Iw,Ipe,Imod,lOn,Aw,Ab,dmm};
+    AAR:Acells/Amod*100,Pcells,steps,P,CTM:P/Pcells*100,eta,etaG,Voc,Isc,Imp,Vmp,FF,kI,Agap,Pw,Pbus,Pj,Rw,Rbus,Rjt,Rcab,Iw,Ipe,Imod,lOn,lSh,Aw,Ab,dmm};
   if(light)return R;
   // datasheet: sıcaklık, bifasiyal, garanti
   const rr=LIB.rear.items[p.rearV]||{},er=LIB.enc.items[p.encRV]||{};
@@ -304,7 +315,7 @@ function evaluate(p,light){
   const Ag=Aglass/1e6,perim=2*(L+W)/1000;
   const rear=LIB.rear.items[p.rearV]||{kind:'glass'};
   const eF=LIB.enc.items[p.encFV]||{rho:0.95},eR=LIB.enc.items[p.encRV]||{rho:0.95};
-  const wireLen=N*p.nbb*(2*lOn+Math.max(p.gc,0))/1000;
+  const wireLen=N*p.nbb*(2*lSh+Math.max(p.gc,0))/1000;
   const busLen=Np*2*blockW/1000+2*p.lead/1000;
   const fr=p.frameV!=='none';
   const m={

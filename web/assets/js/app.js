@@ -10,7 +10,7 @@ const TEMPLATES=[
   {id:'gg_tc_m10r',era:'now',l:'Cam-cam çerçeveli · TOPCon M10R 0BB · 144 yarım hücre (2278×1134)',
     lib:{fmtV:'m10r',techV:'topcon0bb',wireV:'r20',coatV:'bare',joinV:'film',rearV:'gr20',encFV:'EPE',encRV:'POE',frameV:'al30'},set:{nbb:20,nc:6,nr:24,gc:1.0,gm:6,eL:19.5,eW:11.15,Pplate:590,Lmax:2280,Wmax:1136}},
   {id:'gg_tc_g12',era:'now',auto:true,l:'Cam-cam çerçeveli · TOPCon G12 · 132 yarım hücre, 18BB',
-    lib:{fmtV:'g12',techV:'topcon',wireV:'r22',rearV:'gr20',encFV:'EPE',encRV:'POE',frameV:'al35',jboxV:'split35',cableV:'c40_400'},set:{nbb:18,nc:6,nr:22,gc:1.0,gm:6,eL:24,eW:15.25}},
+    lib:{fmtV:'g12',techV:'topcon',wireV:'r22',rearV:'gr20',encFV:'EPE',encRV:'POE',frameV:'al35',jboxV:'split35',cableV:'c40_400'},set:{nbb:18,nc:6,nr:22,gc:1.0,gm:6,eL:21,eW:12.25}},
   {id:'gg_hjt_g12',era:'now',l:'Cam-cam çerçevesiz · HJT G12 · 132 yarım hücre (2384×1303)',
     lib:{fmtV:'g12',techV:'hjt',wireV:'r22',coatV:'snbi',joinV:'lt',glassFV:'g20ar',rearV:'gc20',encFV:'POE',encRV:'POE',frameV:'none',edgeV:'tape',jboxV:'split35',cableV:'c40_400'},set:{nbb:18,nc:6,nr:22,gc:1.0,gm:6,eL:24,eW:15.25,Pplate:705,Lmax:2386,Wmax:1305}},
   {id:'gg_hjt_g12r',era:'now',auto:true,l:'Cam-cam çerçeveli · HJT G12R Cu kaplama · 132 yarım hücre, 0BB',
@@ -61,6 +61,8 @@ function fromTemplate(id){
   cellDerived(d.p);
   d.p.Rb=rearRb(d.p);d.p.Tf=(LIB.enc.items[d.p.encFV]||{T:99}).T;
   if(tp.auto){const r=evaluate(d.p,true);d.p.Lmax=Math.ceil(r.L)+2;d.p.Wmax=Math.ceil(r.W)+2;}
+  // montaj delikleri: şablonda yoksa modül boyuna göre (≥ 2200 mm: 1400 / 400; daha kısa: ≈ 0,6·L, ikinci delik yok)
+  if(!('mh1' in tp.set)){const r=evaluate(d.p,true);if(r.L<2200){d.p.mh1=Math.round(0.6*r.L/10)*10;d.p.mh2=0;}}
   // etiket gücü: ölçülen gücün ≥ %97,7'si etiketin üstünde kalacak şekilde (nominal − 2σ), sınıf adımına yuvarlanır
   if(tp.auto||!('Pplate' in tp.set)){const r=evaluate(d.p,true);const sg=Math.sqrt(d.p.sCTM**2+d.p.sMeas**2)/100;d.p.Pplate=Math.floor(r.P*(1-2*sg)/d.p.bin)*d.p.bin;}
   return {name:tp.l,p:d.p,t:d.t,tpl:tp.id};
@@ -108,6 +110,7 @@ function buildInputs(){
   if($('#inputsIV'))$('#inputsIV').innerHTML=groupHTML('iv',false);
   if($('#inputsShade'))$('#inputsShade').innerHTML=groupHTML('shade',true);
   if($('#inputsLoad'))$('#inputsLoad').innerHTML=groupHTML('load',true);
+  if($('#inputsMload'))$('#inputsMload').innerHTML=groupHTML('mload',false);
   if($('#inputsSite'))$('#inputsSite').innerHTML=groupHTML('site',true);
   $('#inputsCost').innerHTML=groupHTML('cost',false);
   $('#in-cur').innerHTML=SCH.cur.opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
@@ -193,9 +196,11 @@ function renderMini(){
 }
 $('#measApply').onclick=()=>{const v=parseNum($('#measP').value),m=$('#measOut');
   if(!(v>0)){m.className='msg er';m.textContent='Geçerli bir güç girin (W).';return;}
-  const base=R.P/S.p.kCal,old=R.P,k=v/base;
+  const base=R.P/S.p.kCal,old=R.P;let k=v/base;
   if(k<0.8||k>1.2){m.className='msg er';m.textContent=`Ölçüm modelden %${f(Math.abs(k-1)*100,1)} farklı. Hücre gücünü, dizilimi ve malzemeleri kontrol edin; kalibrasyon ±%20 ile sınırlıdır.`;return;}
-  S.p.kCal=+k.toFixed(4);syncInputs();schedule();
+  // k_kal gerilimi ölçekler, dış direnç düşümü sabit kalır: iki düzeltme adımıyla tam uyum
+  for(let i=0;i<2;i++){const r=evaluate(Object.assign({},S.p,{kCal:k}));k*=v/r.P;}
+  S.p.kCal=+k.toFixed(5);syncInputs();schedule();
   m.className='msg ok';m.textContent=`k_kal = ${f(k,4)} uygulandı (model ${f(old,1)} W → ${f(v,1)} W, fark ${fs((v/old-1)*100,2)} %). Bu çarpan tüm tasarım varyantlarına uygulanır; ayrıntılı kalibrasyon CTM sekmesinde.`;};
 function renderViol(){
   const html=R.viol.length?R.viol.map(v=>`<div>${esc(v.m)}</div>`).join(''):'<p class="okmsg">Tüm sınır kontrolleri uygun.</p>';
@@ -493,7 +498,7 @@ $('#resetBtn').onclick=()=>{const b=$('#resetBtn');if(!resetArm){resetArm=true;b
   resetArm=false;b.textContent='Varsayılana dön';S=fromTemplate(TEMPLATES[0].id);MC=null;mcKey='';syncInputs();recompute();};
 
 /* ---- Sekmeler ---- */
-const TABS=['tasarim','cizim','ctm','elektrik','tolerans','olcum','maliyet','saha','kutuphane','karsilastir','kayit'];
+const TABS=['tasarim','cizim','mekanik','ctm','elektrik','tolerans','olcum','maliyet','saha','kutuphane','karsilastir','kayit'];
 function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;if(t==='tolerans')mcAuto();if(t==='cizim'&&window.renderSheets)renderSheets();document.dispatchEvent(new CustomEvent('tabshown',{detail:t}));try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)go(b.dataset.tab);});
 window.addEventListener('hashchange',()=>go((location.hash||'').slice(1)));

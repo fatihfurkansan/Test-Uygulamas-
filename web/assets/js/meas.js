@@ -62,10 +62,13 @@ $('#msSample').onclick=()=>{
 function msCalibrate(st){
   const q=Object.assign({},S.p),log=[];
   if(st.Isc){for(let i=0;i<3;i++){const r=evaluate(q);q.kOptCal=(q.kOptCal||1)*st.Isc/r.Isc;}log.push('k_opt');}
+  // k_R (FF) ve k_kal (kalan Pmax, gerilim ölçeği) birbirini az etkiler: iki tur
+  for(let pass=0;pass<2;pass++){
   if(st.FF){const FFm=st.FF;let lo=0.05,hi=5;const ff=k=>{q.kRes=k;return evaluate(q).FF;};
     const fLo=ff(lo),fHi=ff(hi);
-    if(FFm>fLo)q.kRes=lo;else if(FFm<fHi)q.kRes=hi;else{for(let i=0;i<30;i++){const m=(lo+hi)/2;if(ff(m)>FFm)lo=m;else hi=m;}q.kRes=(lo+hi)/2;}log.push('k_R');}
-  for(let i=0;i<3;i++){const r=evaluate(q);q.kCal=q.kCal*st.P/r.P;}log.push('k_kal');
+    if(FFm>fLo)q.kRes=lo;else if(FFm<fHi)q.kRes=hi;else{for(let i=0;i<30;i++){const m=(lo+hi)/2;if(ff(m)>FFm)lo=m;else hi=m;}q.kRes=(lo+hi)/2;}if(!pass)log.push('k_R');}
+    for(let i=0;i<3;i++){const r=evaluate(q);q.kCal=q.kCal*st.P/r.P;}}
+  log.push('k_kal');
   const r=evaluate(q),warn=[];
   if(q.kOptCal<0.8||q.kOptCal>1.2)warn.push(`k_opt = ${f(q.kOptCal,4)} izin verilen aralığın (0,8–1,2) dışında; hücre Isc değerini kontrol edin.`);
   if(q.kRes<=0.0501||q.kRes>=4.99)warn.push(`Ölçülen FF modelin ulaşabileceği aralığın dışında (k_R sınırda: ${f(q.kRes,2)}). Hücre FF / Rs veya Rsh değerini kontrol edin.`);

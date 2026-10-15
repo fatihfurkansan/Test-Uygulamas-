@@ -41,7 +41,7 @@ function renderTornado(force){
   },60);
 }
 $('#tnMetric').addEventListener('change',()=>renderTornado(true));
-document.addEventListener('tabshown',e=>{if(e.detail==='tolerans')renderTornado();if(e.detail==='kayit')renderRevs();if(e.detail==='cizim')renderMech();});
+document.addEventListener('tabshown',e=>{if(e.detail==='tolerans')renderTornado();if(e.detail==='kayit')renderRevs();if(e.detail==='mekanik')renderMech();});
 
 /* ---- Ö8 · Revizyonlar ---- */
 let REVS=LS.get('pvm.revs')||[];
@@ -106,6 +106,6 @@ $('#certTbl').addEventListener('click',e=>{const t=e.target.closest('[data-cdelc
 
 {const _rcA=recompute;recompute=function(){_rcA();
   if(!$('[data-panel="tolerans"]').hidden)renderTornado();
-  if(!$('[data-panel="cizim"]').hidden)renderMech();
+  if(!$('[data-panel="mekanik"]').hidden)renderMech();
   if(!$('[data-panel="kayit"]').hidden)renderRevs();};}
 renderTornado();renderMech();renderRevs();

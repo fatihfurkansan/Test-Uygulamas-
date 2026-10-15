@@ -1,7 +1,7 @@
 /* PV Modül Tasarım service worker: çevrimdışı çalışma */
-const VERSION='pvm-v5';
+const VERSION='pvm-v6';
 const CORE=['/','/app/','/manifest.webmanifest','/assets/css/app.css','/assets/css/site.css',
-  '/assets/js/library.js','/assets/js/iv.js','/assets/js/engine.js','/assets/js/app.js','/assets/js/libview.js','/assets/js/pwa.js','/assets/js/drawing.js','/assets/js/datasheet.js','/assets/js/elec.js','/assets/js/analysis.js','/assets/js/meas.js','/assets/js/saha.js','/assets/js/site.js',
+  '/assets/js/library.js','/assets/js/iv.js','/assets/js/engine.js','/assets/js/app.js','/assets/js/libview.js','/assets/js/pwa.js','/assets/js/drawing.js','/assets/js/datasheet.js','/assets/js/elec.js','/assets/js/analysis.js','/assets/js/meas.js','/assets/js/saha.js','/assets/js/mech.js','/assets/js/site.js',
   '/assets/vendor/xlsx.full.min.js','/assets/icons/icon.svg','/assets/icons/icon-192.png','/assets/icons/icon-512.png','/assets/icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(CORE)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSION&&!k.startsWith('fonts')).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

@@ -29,7 +29,7 @@
   </div>
   <nav class="wrap tabs" role="tablist" id="tabs">
     <button class="tab" role="tab" data-tab="tasarim">Tasarım</button>
-    <button class="tab" role="tab" data-tab="cizim">Çizim</button>
+    <button class="tab" role="tab" data-tab="cizim">Çizim</button><button class="tab" role="tab" data-tab="mekanik">Mekanik</button>
     <button class="tab" role="tab" data-tab="ctm">CTM</button>
     <button class="tab" role="tab" data-tab="elektrik">Elektrik</button>
     <button class="tab" role="tab" data-tab="tolerans">Tolerans</button>
@@ -82,14 +82,23 @@
       <p class="note">Telefonda yakınlaştırmak için + düğmesini veya iki parmakla büyütmeyi kullanın. Yazdır / PDF, teknik resim seçiliyken iki paftayı A3 yatay, datasheet seçiliyken iki sayfayı A4 dikey olarak çıkarır; tarayıcıda "PDF olarak kaydet" seçin. Kırmızı ölçüler sınır ihlalidir.</p>
     </div>
     <div class="card"><h3>Sınır kontrolleri</h3><div class="viol" id="violBox2"></div></div>
-    <div class="card"><div class="cardhead"><h3>Mekanik yük beyanı</h3><small id="mechStat"></small></div>
+    <div id="inputsMech" class="panel"></div>
+  </section>
+
+  <!-- MEKANİK -->
+  <section class="panel" data-panel="mekanik" hidden>
+    <div class="card"><div class="cardhead"><h3>Mekanik yük beyanı ve sertifika kapsamı</h3><small id="mechStat"></small></div>
       <div id="inputsLoad"></div>
       <h3 style="margin-top:14px">Sertifikalı mekanik kapsam</h3>
       <p class="note">Sertifika raporlarınızdaki cam / çerçeve / montaj kombinasyonlarını ve test yüklerini girin. Tasarım bu tabloyla karşılaştırılır. Kayıtlar bu cihazda saklanır.</p>
       <div class="tw" id="certTbl"></div>
       <div class="btns" style="margin-top:8px"><button class="btn sm" id="certAdd">Mevcut tasarımı kapsam olarak ekle</button></div>
     </div>
-    <div id="inputsMech" class="panel"></div>
+    <div class="card"><div class="cardhead"><h3>Mekanik yük simülasyonu</h3><small id="mechState"></small></div>
+      <p class="note">Test yükünde (tasarım yükü × γm) laminatın ve çerçevenin sehimi, cam ve çerçeve gerilmeleri ve hücre katmanı uzaması. Büyük sehim (membran) etkisi dahildir; ayrıntı ve varsayımlar sonuçların altında.</p>
+      <div id="inputsMload"></div>
+    </div>
+    <div id="mechOut" class="panel"><p class="note">Hesaplanıyor…</p></div>
   </section>
 
   <!-- CTM -->
@@ -267,6 +276,7 @@
 <script src="../assets/js/analysis.js"></script>
 <script src="../assets/js/meas.js"></script>
 <script src="../assets/js/saha.js"></script>
+<script src="../assets/js/mech.js"></script>
 <script src="../assets/js/pwa.js"></script>
 <div id="printBox" class="printbox" aria-hidden="true"></div>
 </body>

@@ -4,7 +4,7 @@
 
 /* Basit SVG çizgi grafik (tema renkleriyle) */
 function lineChart(o){
-  const W=o.w||420,H=o.h||236,ml=40,mr=12,mt=20,mb=34;
+  const W=o.w||420,H=o.h||236,ml=40,mr=22,mt=20,mb=34;
   let xmax=o.xmax,ymax=o.ymax;
   if(xmax===undefined){xmax=0;for(const s of o.series)for(const x of s.x)xmax=Math.max(xmax,x);}
   if(ymax===undefined){ymax=0;for(const s of o.series)for(const y of s.y)ymax=Math.max(ymax,y);}
@@ -36,7 +36,7 @@ function renderElec(){
   $('#ivNote').textContent=fc.ok?'hücre noktaları modelle uyumlu':'hücre noktaları modelle tam uyuşmuyor';
   box.innerHTML=[['Pmax (IV)',f(R.P,1)+' W',1],['Voc',f(R.Voc,2)+' V'],['Isc',f(R.Isc,3)+' A'],['Vmpp',f(R.Vmp,2)+' V'],['Impp',f(R.Imp,3)+' A'],['FF',f(R.FF*100,2)+' %'],
     ['Hücre ideallik n',f(fc.n,3)],['Hücre Rs',f(fc.Rs*1000,3)+' mΩ'],['Hücre Rsh',f(fc.Rsh,1)+' Ω'],['Hücre I0',fc.I0.toExponential(2)+' A'],
-    ['Uyum hatası Pmax',fs(fc.errP,2)+' %'],['Uyum hatası Impp',fs(fc.errImp,2)+' %'],['Modül dış seri R',f(R.Rext*1000,1)+' mΩ'],['IV ↔ güç zinciri',fs((R.P/R.Pchain-1)*100,2)+' %']]
+    ['Uyum hatası Pmax',fs(fc.errP,2)+' %'],['Uyum hatası Impp',fs(fc.errImp,2)+' %'],['n·Vt sıcaklık üssü m',f(R.ivSpec.mT,2)+(R.ivSpec.mTok?'':' !')],['Modül dış seri R',f(R.Rext*1000,1)+' mΩ'],['IV ↔ güç zinciri',fs((R.P/R.Pchain-1)*100,2)+' %']]
     .map(([i,v,h])=>`<div class="stat${h?' hl':''}"><i>${i}</i><b>${v}</b></div>`).join('');
   // I-V (ışınım) ve P-V (sıcaklık)
   const sG=[1000,800,600,400,200].map((G,i)=>{const m=moduleIV(Object.assign({},R.ivSpec,{G}));const d=downs(m);return {x:d.x,y:d.y,label:G+' W/m²',c:i,mark:[m.Vmp,m.Imp],lp:0.06};});
