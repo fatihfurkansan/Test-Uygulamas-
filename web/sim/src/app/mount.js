@@ -11,8 +11,9 @@ import { LineEditor } from './editor.js';
 import { Inspector } from './inspector.js';
 import { Palette } from './palette.js';
 import { ReportPanel } from './report.js';
+import { LineWizard } from './wizard.js';
 import { injectStyles } from './styles.js';
-import { ICON, clock, num } from './ui.js';
+import { ICON, clock, num, esc } from './ui.js';
 
 const SPEEDS = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
 const SAMPLES = {
@@ -30,6 +31,12 @@ const TOUCH_HINT = {
 };
 // Dar ekran (telefon dikey) veya kısa ekran (telefon yatay): denetçi alttan açılan panel olur
 const COMPACT = '(max-width: 900px), (max-height: 520px)';
+// Tarayıcı deposu: son çalışma (otomatik) ve adlı kayıtlı hatlar — yalnız bu cihazda
+const AUTOSAVE = 'pvsim.autosave.v1', LINES = 'pvsim.lines.v1';
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+};
 
 const TEMPLATE = `
 <div class="pvsim-bar">
@@ -60,12 +67,15 @@ const TEMPLATE = `
     <div class="pv-menuwrap">
       <button class="pv-tbtn" data-menu="file" aria-label="Dosya">${ICON.file}Dosya</button>
       <div class="pv-menu right" data-for="file" hidden>
+        <button data-act="wizard">Yeni hat sihirbazı…</button>
         <button data-act="new">Boş hat</button>
         <button data-act="sample">Örnek hat (20 istasyon)</button>
         <button data-act="full">Tam PV modül hattı (tüm süreçler)</button>
         <hr>
-        <button data-act="open">Aç… (.simjson)</button>
-        <button data-act="save">Kaydet (.simjson)</button>
+        <button data-act="lines">Kayıtlı hatlarım…</button>
+        <hr>
+        <button data-act="open">Dosyadan aç… (.simjson)</button>
+        <button data-act="save">Dosyaya kaydet (.simjson)</button>
       </div>
     </div>
     <button class="pv-ibtn" data-act="fullscreen" aria-pressed="false" aria-label="Tam ekran" title="Tam ekran">${ICON.expand}</button>
@@ -74,10 +84,12 @@ const TEMPLATE = `
 <div class="pvsim-main">
   <div class="pvsim-viewport">
     <div class="pv-rail" role="toolbar" aria-label="Düzenleme araçları">
-      <button class="pv-ibtn" data-act="library" aria-pressed="false" title="Süreç kütüphanesi">${ICON.library}</button>
+      <button class="pv-ibtn" data-act="library" aria-pressed="false" aria-label="Süreç kütüphanesi" title="Süreç kütüphanesi: ekle">${ICON.library}</button>
+      <button class="pv-ibtn" data-act="wizard" aria-label="Yeni hat sihirbazı" title="Yeni hat sihirbazı">${ICON.wand}</button>
       <span class="pv-rail-sep"></span>
-      <button class="pv-ibtn" data-tool="select" aria-pressed="true" title="Seç / taşı (V)">${ICON.cursor}</button>
-      <button class="pv-ibtn" data-tool="connect" aria-pressed="false" title="Konveyör bağla (C)">${ICON.link}</button>
+      <button class="pv-ibtn" data-tool="select" aria-pressed="true" aria-label="Seç / taşı" title="Seç / taşı (V)">${ICON.cursor}</button>
+      <button class="pv-ibtn" data-tool="connect" aria-pressed="false" aria-label="Konveyör bağla" title="Konveyör bağla (C)">${ICON.link}</button>
+      <button class="pv-ibtn" data-act="arrange" aria-label="Otomatik yerleşim" title="Otomatik yerleşim: akışa göre düzenle">${ICON.arrange}</button>
       <span class="pv-rail-sep"></span>
       <button class="pv-ibtn" data-act="undo" title="Geri al (Ctrl+Z)">${ICON.undo}</button>
       <button class="pv-ibtn" data-act="redo" title="Yinele (Ctrl+Y)">${ICON.redo}</button>
@@ -91,6 +103,13 @@ const TEMPLATE = `
       <button class="pv-ibtn solid" data-act="home" aria-label="Hattın tamamını göster" title="Hattın tamamını göster">${ICON.home}</button>
     </div>
     <div class="pv-modehint" hidden></div>
+    <div class="pv-empty" hidden><div>
+      <span class="cap">Boş hat</span>
+      <h3>Üretim hattını sıfırdan kurun</h3>
+      <p>Sihirbazda hedef kapasiteyi ve süreç adımlarını seçin; hat bağlanmış ve yerleşmiş olarak gelir. Ya da kütüphaneden ilk istasyonu yerleştirin, sonrakileri <b>Sonrasına ekle</b> ile sırayla ekleyin.</p>
+      <div class="pv-actions"><button class="pv-tbtn pri" data-act="wizard">${ICON.wand}Sihirbazla oluştur</button>
+      <button class="pv-tbtn" data-act="library">${ICON.library}Kütüphaneden ekle</button></div>
+    </div></div>
     <div class="pvsim-hint"></div>
   </div>
   <aside class="pvsim-side" aria-label="Denetçi">
@@ -102,8 +121,9 @@ const TEMPLATE = `
 
 // exportMode: 'download' (dosya indirir) | 'dialog' (metni kopyalanabilir pencerede gösterir — indirmenin
 // engellendiği gömülü önizlemeler için)
+// restore: son çalışmayı tarayıcı deposundan aç (yoksa örnek hat)
 export function mountLineSimulator(container, { layout = null, sample = !layout, speed = 10, autoplay = false,
-                                                 exportMode = 'download' } = {}) {
+                                                 exportMode = 'download', restore = !layout } = {}) {
   const doc = container.ownerDocument;
   const win = doc.defaultView;
   injectStyles(doc);
@@ -123,7 +143,16 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
   const view = new LineView3D($('.pvsim-viewport'), session);
   const editor = new LineEditor(root, view, session);
   const inspector = new Inspector($('.pv-side-body'), session, editor);
-  const palette = new Palette($('.pv-palette'), editor);
+  const palette = new Palette($('.pv-palette'), editor, { touch: coarse });
+  inspector.onInsertAfter = () => setPalette(true);
+  const wizard = new LineWizard($('.pvsim-main'), {
+    onBuild: L => {
+      session.replace(L);
+      setPalette(false);
+      toast('Hat oluşturuldu. Önceki hatta dönmek için Geri al.');
+    },
+  });
+  wizard.onError = msg => toast(msg, true);
   const report = new ReportPanel($('.pvsim-main'), session);
   report.exporter = (name, text, mime) => exportFile(name, text, mime);
   const fileInput = $('input[type=file]');
@@ -144,9 +173,11 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
   // keepPlacing: dar ekranda tip seçilince çekmece kapanır, yerleştirme sürer
   const setPalette = (open, keepPlacing = false) => {
     $('.pv-palette').hidden = !open;
-    $('[data-act=library]').setAttribute('aria-pressed', String(open));
+    $('.pv-rail [data-act=library]').setAttribute('aria-pressed', String(open));
+    if (open) { palette.open(); wizard.hide(); }
     if (open && compact.matches) setSheet(false);
     if (!open && !keepPlacing) editor.cancel();
+    syncEmpty();
   };
   palette.onClose = () => setPalette(false);
   palette.onPick = () => { if (compact.matches) setPalette(false, true); };
@@ -228,6 +259,7 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
         ? (editor.linkFrom != null ? `Hedef istasyona ${tap}` : `Konveyör bağla: kaynak istasyona ${tap}`)
         : '';
     hint.hidden = !text;
+    syncEmpty();
     hint.innerHTML = text && `<span>${text}</span><button data-act="cancel">${editor.placing || editor.linkFrom != null ? 'İptal' : 'Bitir'}</button>`;
   };
 
@@ -241,7 +273,7 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
   // ── Düğmeler ──
   const onClick = e => {
     const btn = e.target.closest('button');
-    if (!btn || !root.contains(btn) || btn.closest('.pvsim-side, .pv-palette, .pv-report')) return;
+    if (!btn || !root.contains(btn) || btn.closest('.pvsim-side, .pv-palette, .pv-report, .pv-wiz, .pv-dialog')) return;
     if (btn.dataset.menu) {
       const m = root.querySelector(`.pv-menu[data-for="${btn.dataset.menu}"]`);
       const willOpen = m.hidden;
@@ -273,15 +305,20 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
         break;
       }
       case 'library': setPalette($('.pv-palette').hidden); break;
+      case 'wizard': report.hide(); setPalette(false); wizard.show(); break;
+      case 'arrange':
+        if (!session.layout.stations.size) break;
+        editor.arrange();
+        toast('Yerleşim akışa göre düzenlendi. Geri al ile eski yerleşime dönebilirsiniz.');
+        break;
+      case 'lines': linesDialog(); break;
       case 'undo': session.undo(); break;
       case 'redo': session.redo(); break;
-      case 'report': report.open ? report.hide() : report.show(); break;
-      case 'new': {
-        const L = createDefaultLayout();
-        session.load(L);
-        setPalette(true);
+      case 'report': wizard.hide(); report.open ? report.hide() : report.show(); break;
+      case 'new':
+        session.replace(createDefaultLayout());
+        currentName = '';
         break;
-      }
       case 'sample': loadSample('sample'); break;
       case 'full': loadSample('full'); break;
       case 'open': fileInput.click(); break;
@@ -297,7 +334,8 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
     fileInput.value = '';
     if (!f) return;
     try {
-      session.load(JSON.parse(await f.text()));
+      session.replace(JSON.parse(await f.text()));
+      currentName = session.layout.meta.name || f.name.replace(/\.(simjson|json)$/i, '');
       toast(`${f.name} açıldı`);
     } catch (err) {
       toast(`Dosya açılamadı: ${err.message}`, true);
@@ -314,15 +352,92 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
     }),
     session.on('history', syncHistory),
     session.on('select', onSelect),
-    session.on('layout', () => { refresh(); syncHandle(); if (report.open) report.render(); }),
+    session.on('layout', () => { refresh(); syncHandle(); syncEmpty(); scheduleSave(); if (report.open) report.render(); }),
+    session.on('edit', () => { syncEmpty(); scheduleSave(); }),
     session.on('reset', () => { refresh(); if (report.open) report.render(); }),
   ];
   syncHistory();
 
-  async function loadSample(which) {
-    const res = await fetch(SAMPLES[which]);
-    session.load(await res.json());
+  async function loadSample(which, initial = false) {
+    try {
+      const data = await (await fetch(SAMPLES[which])).json();
+      if (initial) session.load(data); else session.replace(data);
+      currentName = '';
+    } catch (err) {
+      toast(`Örnek yüklenemedi: ${err.message}`, true);
+      return;
+    }
     if (autoplay) session.play();
+  }
+
+  // ── Boş hat kartı ──
+  // kütüphane açıkken ya da yerleştirirken kart zemini kapatmasın
+  function syncEmpty() {
+    $('.pv-empty').hidden = session.layout.stations.size > 0 || !$('.pv-palette').hidden || !!editor.placing;
+  }
+
+  // ── Otomatik kayıt: her düzenlemeden kısa süre sonra son çalışma bu cihaza yazılır ──
+  let saveTimer = 0, currentName = '';
+  const writeAutosave = () => {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    store.set(AUTOSAVE, { savedAt: Date.now(), name: currentName, data: session.layout.toJSON() });
+  };
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(writeAutosave, 800);
+  }
+  const onHide = () => { if (saveTimer) writeAutosave(); };
+  win.addEventListener('pagehide', onHide);
+
+  // ── Kayıtlı hatlar (bu cihazda, adlı) ──
+  function linesDialog() {
+    const fmt = t => new Date(t).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const d = doc.createElement('div');
+    d.className = 'pv-dialog';
+    const render = () => {
+      const lines = store.get(LINES) ?? [];
+      d.innerHTML = `<div class="pv-dialog-box pv-lines" role="dialog" aria-label="Kayıtlı hatlar">`
+        + `<div class="pv-dialog-head"><b>Kayıtlı hatlarım</b><button class="pv-ibtn" data-x aria-label="Kapat">${ICON.close}</button></div>`
+        + `<div class="pv-lines-save"><span class="pv-in"><input type="text" data-name placeholder="Hat adı" value="${esc(currentName)}"></span>`
+        + `<button class="pv-tbtn pri" data-save>${ICON.save}Mevcut hattı kaydet</button></div>`
+        + `<div class="pv-lines-list">${lines.length ? lines.map((l, i) => `<div class="pv-lines-row"><div><b>${esc(l.name)}</b>`
+          + `<small>${l.stations} istasyon · ${fmt(l.savedAt)}</small></div>`
+          + `<button class="pv-tbtn" data-open="${i}">Aç</button><button class="pv-tbtn danger" data-del="${i}">Sil</button></div>`).join('')
+          : '<p class="pv-muted">Henüz kayıtlı hat yok.</p>'}</div>`
+        + `<div class="pv-dialog-foot"><small>Hatlar bu tarayıcıda saklanır. Başka cihaza taşımak için Dosya › Dosyaya kaydet.</small></div></div>`;
+    };
+    render();
+    d.addEventListener('click', e => {
+      if (e.target === d || e.target.closest('[data-x]')) { d.remove(); return; }
+      const lines = store.get(LINES) ?? [];
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-save')) {
+        const name = d.querySelector('[data-name]').value.trim() || `Hat ${fmt(Date.now())}`;
+        session.layout.meta.name = name;
+        const entry = { name, savedAt: Date.now(), stations: session.layout.stations.size, data: session.layout.toJSON() };
+        const i = lines.findIndex(l => l.name === name);
+        if (i >= 0) lines[i] = entry; else lines.unshift(entry);
+        if (!store.set(LINES, lines)) { toast('Kaydedilemedi: tarayıcı deposu kapalı veya dolu', true); return; }
+        currentName = name;
+        scheduleSave();
+        toast(i >= 0 ? `"${name}" güncellendi` : `"${name}" kaydedildi`);
+        render();
+      } else if (b.dataset.open != null) {
+        const l = lines[Number(b.dataset.open)];
+        session.replace(l.data);
+        currentName = l.name;
+        d.remove();
+        toast(`"${l.name}" açıldı`);
+      } else if (b.dataset.del != null) {
+        if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Emin misiniz?'; return; }
+        lines.splice(Number(b.dataset.del), 1);
+        store.set(LINES, lines);
+        render();
+      }
+    });
+    root.appendChild(d);
   }
 
   function exportFile(name, text, mime) {
@@ -427,8 +542,20 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
   inspector.render();
   refresh();
   syncHandle();
-  if (sample) loadSample('sample');
+  // Açılış: verilen hat → son çalışma → örnek hat
+  const auto = restore ? store.get(AUTOSAVE) : null;
+  let restored = false;
+  if (auto?.data) {
+    try {
+      session.load(auto.data);
+      currentName = auto.name ?? '';
+      restored = true;
+      toast(auto.data.stations?.length ? 'Son çalışmanız açıldı' : 'Boş hattınız açıldı');
+    } catch { /* bozuk kayıt: örnekle başla */ }
+  }
+  if (!restored && sample) loadSample('sample', true);
   else if (autoplay) session.play();
+  syncEmpty();
 
   return {
     session,
@@ -442,6 +569,9 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
       offs.forEach(off => off());
       root.removeEventListener('click', onClick);
       root.removeEventListener('keydown', onEsc, true);
+      win.removeEventListener('pagehide', onHide);
+      onHide();
+      palette.dispose();
       doc.removeEventListener('pointerdown', onDocDown);
       doc.removeEventListener('fullscreenchange', syncFullscreen);
       doc.removeEventListener('webkitfullscreenchange', syncFullscreen);

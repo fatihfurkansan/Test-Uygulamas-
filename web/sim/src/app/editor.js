@@ -6,7 +6,7 @@
 // (Shift basılıysa yerleştirmeye devam eder).
 // Kısayollar: V seç · C bağla · R döndür · Del sil · Ctrl+D çoğalt · Ctrl+Z / Ctrl+Y · Esc · Boşluk oynat
 // Dokunmatik: tek parmak görünümü döndürür; istasyonu taşımak için üzerine basılı tutup sürükleyin.
-import { catalogOf } from '../core/index.js';
+import { catalogOf, insertAfter, addParallel, autoArrange } from '../core/index.js';
 
 const SNAP = 0.5;                 // metre
 const snap = v => Math.round(v / SNAP) * SNAP;
@@ -191,9 +191,9 @@ export class LineEditor {
       const m = L.meta.metersPerPx;
       const s = L.addStation(kind, snap(p.x) / m, snap(p.z) / m);
       S.commit();
+      if (!e.shiftKey) this.cancel();   // önce bitir: seçim değişince kütüphane "sonrasına ekle"ye geçer
       S.select(s.id);
       this.onPlaced?.(s);
-      if (!e.shiftKey) this.cancel();
       return;
     }
 
@@ -224,6 +224,30 @@ export class LineEditor {
     else this.layout.removeConveyor(sel.id);
     this.session.select(null);
     this.session.commit();
+  }
+
+  // Seçili istasyonun sonrasına ekle (ardıllar yeni istasyona bağlanır); yeni istasyon seçilir
+  insertAfter(fromId, kind) {
+    const s = insertAfter(this.layout, fromId, kind);
+    if (!s) return null;
+    this.session.commit();
+    this.session.select(s.id);
+    return s;
+  }
+
+  addParallelSelection() {
+    const s = addParallel(this.layout, this.session.selectedId);
+    if (!s) return;
+    this.session.commit();
+    this.session.select(s.id);
+  }
+
+  // Akışa göre otomatik yerleşim (serpantin); kamera hattı yeniden sığdırır
+  arrange() {
+    if (!this.layout.stations.size) return;
+    autoArrange(this.layout);
+    this.session.commit();
+    this.view.rebuild(true);
   }
 
   rotateSelection() {

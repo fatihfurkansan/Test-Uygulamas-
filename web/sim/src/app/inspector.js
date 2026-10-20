@@ -6,7 +6,7 @@
 // [data-live] alanları saniyede 4 kez güncellenir (yazılan alan bozulmaz).
 // Alan → hedef eşlemesi data-path ile: st.<alan> · cv.<alan> · set.<alan> · meta.<alan> · sess.<alan>
 //   pt.<id>.<alan> · mat.<id>.<alan> · scen|bin|con|brk.<sıra>.<alan> · ov.<ürün tipi id>
-import { catalogOf, categoryOf, stationTag, STATUS_LABELS, STATUS_COLORS, addStandardBOM } from '../core/index.js';
+import { catalogOf, categoryOf, stationTag, STATUS_LABELS, STATUS_COLORS, addStandardBOM, lineBalance } from '../core/index.js';
 import { BIN_COLORS, BELT_TINT, kindTone } from '../view3d/materials.js';
 import { esc, num, pct, sn, duration, row, meter, sec, stateBar, ICON } from './ui.js';
 
@@ -14,7 +14,8 @@ const DISTS = [['fixed', 'Sabit'], ['normal', 'Normal (ort. ± std)'], ['triangu
                ['uniform', 'Düzgün (en az – en çok)'], ['exponential', 'Üstel (ort. = çevrim)']];
 const ROTS = [['', 'Otomatik (akıştan)'], [0, '0°'], [90, '90°'], [180, '180°'], [270, '270°']];
 const CAT_NAME = { process: 'İşlem', inspection: 'Test / kalite', buffer: 'Ara stok', curing: 'Kürleme', classification: 'Hat sonu' };
-const LINE_TABS = [['summary', 'Özet'], ['products', 'Ürünler'], ['materials', 'Malzemeler'], ['shift', 'Vardiya'], ['model', 'Model']];
+const LINE_TABS = [['summary', 'Özet'], ['balance', 'Denge'], ['products', 'Ürünler'], ['materials', 'Malzemeler'],
+                   ['shift', 'Vardiya'], ['model', 'Model']];
 
 // ── Form parçaları ──
 function attrs(path, o) {
@@ -118,7 +119,14 @@ export class Inspector {
       + [['live', 'Canlı'], ['params', 'Parametreler']].map(([k, t]) =>
         `<button role="tab" data-stab="${k}" aria-selected="${this.stationTab === k}">${t}</button>`).join('') + `</div>`;
     const body = this.stationTab === 'params' ? this._stationForm(s, cat) : this.live('st-live', () => this._stationLive(s, cat));
-    return head + tabs + body;
+    // Hat kurma eylemleri her iki sekmede de üstte
+    const actions = `<div class="pv-actions pv-st-actions">`
+      + `<button class="pv-tbtn" data-act="st-after">${ICON.plus}Sonrasına ekle</button>`
+      + `<button class="pv-tbtn" data-act="st-parallel">${ICON.parallel}Paralel makine</button>`
+      + `<button class="pv-tbtn" data-act="st-rotate" aria-label="Döndür" title="Döndür (R)">${ICON.rotate}</button>`
+      + `<button class="pv-tbtn" data-act="st-dup" aria-label="Çoğalt" title="Çoğalt (Ctrl+D)">${ICON.copy}</button>`
+      + `<button class="pv-tbtn danger" data-act="st-del" aria-label="Sil" title="Sil (Del)">${ICON.trash}</button></div>`;
+    return head + actions + tabs + body;
   }
 
   _stationLive(s, cat) {
@@ -241,10 +249,7 @@ export class Inspector {
       html += sec('Operatör ve malzeme', this._resourceForm(s));
     }
 
-    html += `<div class="pv-actions">`
-      + `<button class="pv-tbtn" data-act="st-rotate">${ICON.rotate}Döndür</button>`
-      + `<button class="pv-tbtn" data-act="st-dup">${ICON.copy}Çoğalt</button>`
-      + `<button class="pv-tbtn danger" data-act="st-del">${ICON.trash}Sil</button></div>`;
+
     return html;
   }
 
@@ -355,6 +360,7 @@ export class Inspector {
       case 'materials': body = this._materialsForm(); break;
       case 'shift': body = this._shiftForm(); break;
       case 'model': body = this._modelForm(); break;
+      case 'balance': body = this._balance(); break;
       default: body = this.live('line-summary', () => this._summary());
     }
     return head + tabs + body;
@@ -394,6 +400,40 @@ export class Inspector {
       + [['empty', 'Boş'], ['moving', 'Taşıyor'], ['waiting', 'Ürün bekliyor'], ['full', 'Dolu, tıkalı']]
         .map(([k, t]) => `<div><i class="belt" style="background:${belt(BELT_TINT[k])}"></i>${t}</div>`).join('')
       + `<div><i class="belt" style="background:#d23b2f"></i>Hatalı ürün hattı</div></div>`);
+    return h;
+  }
+
+  // Hat dengesi: aşamaların efektif çevrimi takt ile karşılaştırılır (tasarım görünümü, simülasyondan bağımsız)
+  _balance() {
+    const b = lineBalance(this.L);
+    let h = sec('Hedef', field('Hedef kapasite', 'set.target_rate', this.L.settings.target_rate ?? 0,
+      { min: 0, unit: 'modül/sa', rerender: 1, hint: 'Takt = 3600 / hedef. 0 = hedef yok.' }));
+    if (!b.stages.length) return h + sec('Hat dengesi', '<p class="pv-muted">Hatta henüz çevrimi olan istasyon yok.</p>');
+    const scale = Math.max(b.takt, b.bottleneck.ect) * 1.08;
+    const bnOver = b.takt && b.bottleneck.ect > b.takt + 1e-9;
+    h += sec('Özet', row('Takt', b.takt ? `${num(b.takt)} sn` : '—')
+      + row('Teorik kapasite', `${num(b.capacity)} /sa`)
+      + row('Darboğaz', `<span class="ui">${esc(b.bottleneck.stations[0].name)}${b.bottleneck.stations.length > 1 ? ` ×${b.bottleneck.stations.length}` : ''}</span> · ${num(b.bottleneck.ect)} sn`)
+      + row('Denge oranı', pct(b.balance))
+      + (b.takt ? hint(bnOver ? `Hedefe ulaşılamıyor: kırmızı aşamalar takttan yavaş. Paralel makine ekleyin veya çevrimi kısaltın.`
+        : 'Tüm aşamalar takt içinde. Gerçek çıktıyı arızalar ve beklemeler düşürür; simülasyonla görün.') : ''));
+    const taktX = b.takt ? b.takt / scale * 100 : 0;
+    h += sec('Aşamalar (akış sırasıyla)', `<div class="pv-bal">`
+      + b.stages.map(st => {
+        const s0 = st.stations[0];
+        const over = b.takt && st.ect > b.takt + 1e-9;
+        const cls = over ? 'over' : st === b.bottleneck ? 'bn' : '';
+        return `<button class="pv-bal-row ${cls}" data-act="sel-st" data-i="${s0.id}">`
+          + `<span class="pv-bal-name"><span class="pv-tag" style="--tone:${kindTone(s0.kind, categoryOf(s0))}">${catalogOf(s0.kind).code}</span>`
+          + `${esc(s0.name)}${st.stations.length > 1 ? ` <small>×${st.stations.length}</small>` : ''}`
+          + `${st.stringLimited ? ' <small>stringer beslemesi</small>' : ''}</span>`
+          + `<span class="pv-bal-bar"><i style="width:${(st.ect / scale * 100).toFixed(1)}%"></i>`
+          + `${taktX ? `<em style="left:${taktX.toFixed(1)}%"></em>` : ''}</span>`
+          + `<b>${num(st.ect)}<small> sn</small></b></button>`;
+      }).join('') + `</div>`
+      + `<div class="pv-legend inline pv-bal-legend"><div><i class="line pv-bal-takt"></i>Takt</div>`
+      + `<div><i class="sq" style="background:var(--accent)"></i>Darboğaz</div><div><i class="sq" style="background:var(--stop)"></i>Takttan yavaş</div></div>`
+      + hint('Çevrim: aşamanın modül başı efektif süresi (paralel makineler, laminasyon partisi, kür fırını kapasitesi dahil). Satıra dokunarak istasyonu seçin.'));
     return h;
   }
 
@@ -517,6 +557,9 @@ export class Inspector {
     const i = Number(btn.dataset.i);
     switch (act) {
       case 'st-rotate': this.editor.rotateSelection(); return;
+      case 'st-after': this.onInsertAfter?.(); return;
+      case 'st-parallel': this.editor.addParallelSelection(); return;
+      case 'sel-st': S.select(i); this.editor.view.focus(i); return;
       case 'st-dup': this.editor.duplicateSelection(); return;
       case 'st-del': this.editor.deleteSelection(); return;
       case 'cv-del': this.editor.deleteSelection(); return;

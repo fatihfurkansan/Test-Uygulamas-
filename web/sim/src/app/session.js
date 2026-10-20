@@ -49,6 +49,18 @@ export class SimSession {
     this._emit('history');
   }
 
+  // Hattı tamamen değiştir (sihirbaz, boş hat, örnek, dosya) — geri alınabilir; simülasyon sıfırlanır
+  replace(data) {
+    this.pause();
+    this.layout.restore(data instanceof Layout ? data.toJSON() : data);
+    this.engine.reset();
+    this.selection = null;
+    this.commit();
+    this._emit('layout', this.layout);
+    this._emit('select', null);
+    this._emit('reset');
+  }
+
   toJSON() {
     return this.layout.toJSON(this.engine);
   }

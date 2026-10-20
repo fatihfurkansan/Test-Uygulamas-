@@ -7,3 +7,5 @@ export { expectedCycle, effectiveCycle, lineStages, lineBottleneck, stationOEE,
          liveStats, shiftReport, warehouseSummary } from './stats.js';
 export { createRng } from './rng.js';
 export { STANDARD_BOM, addStandardBOM } from './bom.js';
+export { flowRanks, flowDir, autoArrange, insertAfter, addParallel, PROCESS_STEPS, defaultSteps, stepRate, suggestStep,
+         buildLine, lineBalance } from './design.js';

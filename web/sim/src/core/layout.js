@@ -83,6 +83,7 @@ export function defaultSettings() {
     break_stops_all: false,       // false: molada sadece operatörlü istasyonlar durur
     operators: 0,                 // vardiyadaki operatör sayısı (0 = sınırsız)
     warmup_h: 0,                  // istatistiklerin sayılmaya başladığı süre (saat)
+    target_rate: 0,               // hedef kapasite (modül/saat); hat dengesindeki takt için, 0 = yok
   };
 }
 
@@ -98,7 +99,7 @@ export class Layout {
     this.nextConveyorId = 1;
     this.nextProductTypeId = 1;
     this.nextMaterialId = 1;
-    this.meta = { metersPerPx: DEFAULT_METERS_PER_PX };
+    this.meta = { metersPerPx: DEFAULT_METERS_PER_PX, name: '' };
     // Yapısal değişiklik sayacı: istasyon/konveyör ekle-sil-taşı ya da görünümü etkileyen
     // parametre değişince artar; motor ve 3D görünüm buna göre yeniden kurar.
     this.revision = 0;
@@ -214,7 +215,7 @@ export class Layout {
     };
     return {
       version: SIMJSON_VERSION,
-      meta: { meters_per_px: this.meta.metersPerPx },
+      meta: { meters_per_px: this.meta.metersPerPx, ...(this.meta.name ? { name: this.meta.name } : {}) },
       settings: structuredClone(this.settings),
       next_station_id: this.nextStationId,
       next_conveyor_id: this.nextConveyorId,
@@ -243,6 +244,7 @@ export class Layout {
   static fromJSON(data) {
     const L = new Layout();
     L.meta.metersPerPx = data.meta?.meters_per_px ?? DEFAULT_METERS_PER_PX;
+    L.meta.name = data.meta?.name ?? '';
     Object.assign(L.settings, structuredClone(data.settings ?? {}));
 
     for (const sd of data.stations ?? []) {

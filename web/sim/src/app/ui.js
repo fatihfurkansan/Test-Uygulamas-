@@ -66,4 +66,7 @@ export const ICON = {
   expand:  svg('<path d="M4 9.5V4h5.5M14.5 4H20v5.5M20 14.5V20h-5.5M9.5 20H4v-5.5M4 4l5.5 5.5M20 4l-5.5 5.5M20 20l-5.5-5.5M4 20l5.5-5.5"/>'),
   shrink:  svg('<path d="M9.5 4v5.5H4M20 9.5h-5.5V4M14.5 20v-5.5H20M4 14.5h5.5V20M4 4l5.5 5.5M20 4l-5.5 5.5M20 20l-5.5-5.5M4 20l5.5-5.5"/>'),
   chevron: svg('<path d="M6 15l6-6 6 6"/>'),
+  parallel: svg('<path d="M4 7.5h16M4 16.5h16"/><path d="M16.5 4l3.5 3.5-3.5 3.5M16.5 13l3.5 3.5-3.5 3.5"/>'),
+  arrange: svg('<path d="M3.5 5h6v4h-6zM14.5 5h6v4h-6zM3.5 15h6v4h-6zM14.5 15h6v4h-6z"/><path d="M9.5 7h5M17.5 9v6M14.5 17h-5"/>'),
+  wand:    svg('<path d="M4 20L15 9"/><path d="M15 4v2.5M15 11.5V14M19.5 9H17M13 9h-2.5M18.2 5.8l-1.6 1.6M18.2 12.2l-1.6-1.6"/>'),
 };

@@ -74,6 +74,8 @@ html.pvsim-lock,html.pvsim-lock body{overflow:hidden!important;overscroll-behavi
   border-radius:2px;font-weight:600;cursor:pointer;white-space:nowrap}
 .pv-tbtn:hover{border-color:var(--ink-3)}
 .pv-tbtn svg{width:16px;height:16px}
+.pv-tbtn.pri{background:var(--ink);border-color:var(--ink);color:#fff}
+.pv-tbtn.pri:hover{background:#2c2f34;border-color:#2c2f34}
 .pv-tbtn.danger{color:var(--stop)}
 .pv-tbtn.danger:hover{border-color:var(--stop)}
 .pv-menuwrap{position:relative}
@@ -123,6 +125,27 @@ html.pvsim-lock,html.pvsim-lock body{overflow:hidden!important;overscroll-behavi
 .pv-pal-item b{display:block;font-weight:600;font-size:13.5px}
 .pv-pal-item small{color:var(--ink-3);font-size:12px}
 .pv-palette .pv-hint{margin:0;padding:10px 14px;border-top:1px solid var(--rule-2)}
+.pv-pal-mode{display:flex;margin:0 10px 8px;border:1px solid var(--ink);border-radius:2px;overflow:hidden}
+.pv-pal-mode button{flex:1;height:30px;background:var(--sheet);border:0;font-weight:600;font-size:12.5px;cursor:pointer}
+.pv-pal-mode button+button{border-left:1px solid var(--ink)}
+.pv-pal-mode button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.pv-pal-anchor{display:flex;align-items:center;gap:8px;margin:0 10px 8px;padding:7px 9px;background:var(--accent-wash);border-left:2px solid var(--accent);font-size:13px}
+.pv-pal-anchor:empty{display:none}
+.pv-pal-anchor b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-pal-anchor span:last-child{margin-left:auto;color:var(--ink-3);white-space:nowrap}
+.pv-pal-anchor .pv-tag{padding:4px 5px;font-size:10.5px}
+.pv-pal-plus{display:none;margin-left:auto;color:var(--accent)}
+.pv-palette.after .pv-pal-plus{display:block}
+.pv-palette.after .pv-pal-item:hover{border-color:var(--accent)}
+
+/* ── boş hat kartı ── */
+.pv-empty{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:16px;pointer-events:none}
+.pv-empty[hidden]{display:none}
+.pv-empty>div{pointer-events:auto;max-width:460px;background:var(--sheet);border:1px solid var(--rule);border-left:3px solid var(--accent);
+  padding:18px 20px 16px;box-shadow:0 8px 24px rgba(22,24,27,.10)}
+.pv-empty h3{margin:8px 0;font:600 21px/1.2 var(--ui)}
+.pv-empty p{margin:0;color:var(--ink-2);line-height:1.5}
+.pv-empty .pv-actions{padding:14px 0 0}
 
 /* ── denetçi ── */
 .pvsim-side{position:relative;z-index:2;width:320px;flex:none;display:flex;flex-direction:column;background:var(--sheet);border-left:1px solid var(--rule)}
@@ -134,6 +157,7 @@ html.pvsim-lock,html.pvsim-lock body{overflow:hidden!important;overscroll-behavi
 .pv-row span{color:var(--ink-2)}
 .pv-row b{font:500 13px var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .pv-row b small{font:400 11px var(--ui);color:var(--ink-3)}
+.pv-row b .ui{font:600 13px var(--ui)}
 .pv-meter{height:4px;background:var(--rule-2);margin:3px 0 7px}
 .pv-meter i{display:block;height:100%;background:var(--ink)}
 .pv-head{display:flex;gap:12px;align-items:flex-start;padding:16px 16px 12px}
@@ -182,6 +206,8 @@ td .pv-flag{margin-left:6px}
 .pv-add svg{width:14px;height:14px}
 .pv-actions{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px}
 .pv-actions .pv-add{margin-top:0}
+.pv-st-actions{gap:6px;padding:0 16px 12px}
+.pv-st-actions .pv-tbtn[aria-label]{width:34px;padding:0;justify-content:center}
 .pv-dist,.pv-stack{display:flex;height:8px;margin:2px 0 12px;background:var(--rule-2);gap:2px}
 .pv-stack{gap:2px;background:none}
 .pv-dist i,.pv-stack i{display:block;height:100%;min-width:2px}
@@ -255,6 +281,75 @@ td .pv-flag{margin-left:6px}
 .pv-tip i{display:inline-block;width:12px;height:2px}
 .pv-tip b{font:500 13px var(--mono)}
 
+/* ── yeni hat sihirbazı ── */
+.pv-wiz{position:absolute;inset:0;z-index:11;display:flex;flex-direction:column;background:var(--paper)}
+.pv-wiz[hidden]{display:none}
+.pv-wiz>.pv-rep-head{flex:none}
+.pv-wiz-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 12px 24px}
+.pv-wiz-body>*{max-width:1080px}
+.pv-wiz-body .pv-sec{background:var(--sheet);border:1px solid var(--rule-2);margin:12px 16px}
+.pv-wiz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 28px}
+.pv-wiz-grid .pv-field{grid-template-columns:1fr 150px}
+.pv-wiz-acts{padding:10px 0 0}
+.pv-wiz-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 18px;margin:12px 16px;padding:14px 16px;background:var(--ink);color:#fff}
+.pv-wiz-sum .cap{color:#b9bdc3}
+.pv-wiz-sum b{display:block;margin-top:6px;font:600 22px/1.2 var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-wiz-sum b small{font-size:12px;font-weight:500;color:#b9bdc3}
+.pv-wiz-sum b.bad{color:#ff9b8f}
+.pv-wiz-sum p{grid-column:1/-1;margin:0;font-size:13px;color:#d6d9dd}
+.pv-wiz-head,.pv-wiz-row{display:grid;grid-template-columns:minmax(0,1.6fr) 112px 112px 136px minmax(130px,1fr);gap:8px 12px;align-items:center}
+.pv-wiz-head{padding:0 0 6px;border-bottom:1px solid var(--rule);font:600 10px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.pv-wiz-row{padding:7px 0;border-bottom:1px solid var(--rule-2)}
+.pv-wiz-row:last-child{border-bottom:0}
+.pv-wiz-row.off .pv-wiz-c,.pv-wiz-row.off .pv-wiz-load{opacity:.3;pointer-events:none}
+.pv-wiz-row.off .pv-wiz-name b{color:var(--ink-3)}
+.pv-wiz-name{display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer}
+.pv-wiz-name input{flex:none;width:16px;height:16px;accent-color:var(--ink)}
+.pv-wiz-name .pv-tag{min-width:38px;padding:4px 5px;font-size:10.5px;text-align:center}
+.pv-wiz-name b{font-weight:600}
+.pv-wiz-name small{display:block;color:var(--ink-3);font-size:11.5px}
+.pv-wiz-c .pv-in{height:30px}
+.pv-wiz-c .pv-check{padding:0;font-size:12.5px}
+.pv-wiz-c .pv-muted{margin:0}
+.pv-wiz-load{display:grid;grid-template-columns:minmax(40px,1fr) auto 40px;align-items:center;gap:8px}
+.pv-wiz-load .pv-hbar{height:6px}
+.pv-wiz-load .pv-hbar i{background:var(--ink-2)}
+.pv-wiz-load .pv-hbar.bn i{background:var(--accent)}
+.pv-wiz-load .pv-hbar.over i{background:var(--stop)}
+.pv-wiz-load b{font:500 13px var(--mono);white-space:nowrap}
+.pv-wiz-load b small{font:400 10.5px var(--ui);color:var(--ink-3)}
+.pv-wiz-load>small{font:500 11.5px var(--mono);color:var(--ink-3);text-align:right}
+.pv-wiz-foot{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 28px;background:var(--sheet);border-top:1px solid var(--rule)}
+.pv-wiz-sp{flex:1}
+
+/* ── hat dengesi ── */
+.pv-bal{display:flex;flex-direction:column;gap:1px;margin:2px -6px 10px}
+.pv-bal-row{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(64px,1fr) 56px;align-items:center;gap:10px;padding:5px 6px;
+  background:none;border:0;border-radius:2px;text-align:left;cursor:pointer}
+.pv-bal-row:hover{background:var(--paper)}
+.pv-bal-name{display:flex;align-items:center;gap:7px;min-width:0;font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-bal-name .pv-tag{flex:none;padding:3px 4px;font-size:9.5px}
+.pv-bal-name small{font-weight:400;color:var(--ink-3)}
+.pv-bal-bar{position:relative;height:8px;background:var(--rule-2)}
+.pv-bal-bar i{display:block;height:100%;background:var(--ink-2)}
+.pv-bal-row.bn .pv-bal-bar i{background:var(--accent)}
+.pv-bal-row.over .pv-bal-bar i{background:var(--stop)}
+.pv-bal-bar em{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed var(--ink)}
+.pv-bal-row b{font:500 12.5px var(--mono);text-align:right;white-space:nowrap}
+.pv-bal-row b small{font:400 10.5px var(--ui);color:var(--ink-3)}
+.pvsim .pv-bal-legend .pv-bal-takt{width:0;height:12px;border-left:2px dashed var(--ink);background:none}
+
+/* ── kayıtlı hatlar ── */
+.pv-lines{width:min(560px,100%)}
+.pv-lines-save{display:flex;gap:8px;padding:0 14px 12px;border-bottom:1px solid var(--rule-2)}
+.pv-lines-save .pv-in{flex:1;height:34px}
+.pv-lines-list{flex:1;min-height:80px;overflow:auto;padding:4px 14px}
+.pv-lines-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--rule-2)}
+.pv-lines-row:last-child{border-bottom:0}
+.pv-lines-row>div{flex:1;min-width:0}
+.pv-lines-row b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-lines-row small{color:var(--ink-3)}
+
 /* ── pencere ve bildirim ── */
 .pv-dialog{position:absolute;inset:0;z-index:40;background:rgba(22,24,27,.35);display:grid;place-items:center;padding:16px}
 .pv-dialog-box{width:min(720px,100%);max-height:80%;display:flex;flex-direction:column;background:var(--sheet);border:1px solid var(--rule);box-shadow:0 12px 32px rgba(22,24,27,.2)}
@@ -289,8 +384,8 @@ td .pv-flag{margin-left:6px}
   .pv-speed button{width:28px;height:34px}
   .pv-speed output{min-width:44px;font-size:14px}
   .pv-tools{gap:6px;padding:6px 8px;margin-left:auto;border-left:0}
-  .pv-tbtn{width:36px;height:36px;padding:0;justify-content:center;gap:0;font-size:0}
-  .pv-tbtn svg{width:18px;height:18px}
+  .pv-tools .pv-tbtn{width:36px;height:36px;padding:0;justify-content:center;gap:0;font-size:0}
+  .pv-tools .pv-tbtn svg{width:18px;height:18px}
   .pv-readouts{overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
   .pv-readouts::-webkit-scrollbar{display:none}
   .pv-ro{gap:4px;padding:0 12px}
@@ -338,6 +433,19 @@ td .pv-flag{margin-left:6px}
   .pv-controls{margin:8px 12px}
   .pv-controls .pv-field{grid-template-columns:1fr minmax(0,190px)}
   .pv-dialog-box{max-height:92%}
+  .pv-wiz-body{padding:0 0 16px}
+  .pv-wiz-body .pv-sec{margin:8px}
+  .pv-wiz-sum{grid-template-columns:1fr 1fr;margin:8px}
+  .pv-wiz-foot{padding:8px 12px}
+  .pv-empty{padding:12px 12px 12px 62px}
+}
+@media (max-width:760px){
+  .pv-wiz-head{display:none}
+  .pv-wiz-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;padding:10px 0}
+  .pv-wiz-name,.pv-wiz-load{grid-column:1/-1}
+  .pv-wiz-c::before{content:attr(data-l);display:block;margin-bottom:3px;font:600 9.5px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .pv-wiz-grid .pv-field{grid-template-columns:1fr 140px}
+  .pv-wiz-foot .pv-check{flex-basis:100%}
 }
 /* telefon dikey: göstergeler ikinci satırda, yatay kaydırılır */
 @media (max-width:640px){
@@ -345,6 +453,7 @@ td .pv-flag{margin-left:6px}
 }
 /* telefon yatay: araç rayı yatay, panel daha yüksek açılır */
 @media (max-height:520px){
+  .pv-empty{padding:56px 12px 12px}
   .pv-rail{flex-direction:row}
   .pv-rail-sep{width:1px;height:auto;margin:2px 0}
   .pv-palette{top:56px}
