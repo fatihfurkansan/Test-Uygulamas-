@@ -10,6 +10,9 @@
 | `assets/js/engine.js` | Hesap motoru: geometri, CTM, datasheet, BOM, Monte Carlo (arayüzden bağımsız) |
 | `assets/js/app.js` | Uygulama arayüzü |
 | `assets/js/libview.js` | Kütüphane sekmesi: arama, karşılaştırma, özel malzeme, fiyat listesi |
+| `/app/#hat` | Hat simülasyonu bölümü (üstteki **Modül tasarımı / Hat simülasyonu** anahtarı) |
+| `sim/` | 3D üretim hattı simülatörü (ES modülleri, Three.js r170 ve yazı tipleri gömülü). İlk açılışta yüklenir, sonra çevrimdışı çalışır. PV-DATA deposundaki `sim3d/` projesinden `node tools/export-site.mjs <web/sim>` ile kopyalanır; burada düzenlemeyin |
+| `assets/js/hat.js` | Bölüm anahtarı ve simülatörün yüklenmesi |
 | `sw.js`, `manifest.webmanifest` | Çevrimdışı önbellek ve kurulum bilgisi |
 | `_headers`, `_redirects`, `404.html` | Netlify ayarları |
 
@@ -60,4 +63,5 @@ cd web && python3 -m http.server 8080
 
 ## Üçüncü taraf
 - SheetJS (xlsx 0.18.5, Apache-2.0) `assets/vendor/` altında yerel olarak barındırılır; Excel dışa aktarımı çevrimdışı da çalışır.
+- Three.js r170 (MIT), Barlow ve IBM Plex Mono yazı tipleri (SIL OFL) `sim/vendor/` altında yerel olarak barındırılır; lisans metinleri yanlarındadır.
 - Yazı tipleri Google Fonts'tan yüklenir ve service worker tarafından önbelleğe alınır; bağlantı yoksa sistem yazı tipi kullanılır.

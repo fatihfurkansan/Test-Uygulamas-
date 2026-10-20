@@ -1,7 +1,7 @@
 {
   "name": "PV Modül Tasarım",
   "short_name": "PV Tasarım",
-  "description": "PV modül tasarımı, CTM, Monte Carlo tolerans analizi, BOM maliyeti ve hammadde kütüphanesi",
+  "description": "PV modül tasarımı, CTM, Monte Carlo tolerans analizi, BOM maliyeti, hammadde kütüphanesi ve 3D üretim hattı simülasyonu",
   "lang": "tr",
   "dir": "ltr",
   "id": "/app/",
@@ -21,6 +21,7 @@
   "shortcuts": [
     {"name": "Kütüphane", "url": "/app/#kutuphane"},
     {"name": "CTM", "url": "/app/#ctm"},
-    {"name": "Maliyet / BOM", "url": "/app/#maliyet"}
+    {"name": "Maliyet / BOM", "url": "/app/#maliyet"},
+    {"name": "Hat simülasyonu", "url": "/app/#hat"}
   ]
 }

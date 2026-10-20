@@ -22,7 +22,7 @@
 <header class="nav">
   <div class="wrap navin">
     <a class="logo" href="/"><img src="/assets/icons/icon.svg" alt="" width="28" height="28"><span>PV Modül Tasarım</span></a>
-    <nav aria-label="Bölümler"><a href="#ozellikler">Özellikler</a><a href="#ctm">CTM modeli</a><a href="#kutuphane">Kütüphane</a><a href="#kurulum">Kurulum</a></nav>
+    <nav aria-label="Bölümler"><a href="#ozellikler">Özellikler</a><a href="#hat">Hat simülasyonu</a><a href="#ctm">CTM modeli</a><a href="#kutuphane">Kütüphane</a><a href="#kurulum">Kurulum</a></nav>
     <a class="btn pri" href="/app/">Uygulamayı aç</a>
   </div>
 </header>
@@ -62,7 +62,25 @@
     </div>
   </section>
 
-  <section id="ctm">
+  <section id="hat">
+    <div class="wrap two">
+      <div>
+        <h2>Üretim hattı simülasyonu</h2>
+        <p>Modülün üretim hattını 3D olarak kurun ve çalıştırın. Hücre kesme ve stringer'dan laminasyona, EL &amp; görsel kontrolden paketlemeye 31 süreç tipi var. Çevrim süresi dağılımları, arıza ve bakım, vardiya ve molalar, operatör ve malzeme stoğu, hurda ve tamir döngüsü parametre olarak girilir.</p>
+        <p class="small">Darboğaz, hat verimi, ilk geçiş verimi, akış süresi ve vardiya raporu simülasyon sürerken hesaplanır. Telefonda tam ekran çalışır.</p>
+        <div class="ctas"><a class="btn pri lg" href="/app/#hat">Hat simülasyonunu aç</a></div>
+      </div>
+      <div class="formulas" role="list">
+        <div role="listitem"><b>Darboğaz</b><code>etkin çevrim = çevrim / paralel istasyon</code></div>
+        <div role="listitem"><b>Hat verimi</b><code>OEE = kullanılabilirlik · performans · kalite</code></div>
+        <div role="listitem"><b>İlk geçiş verimi</b><code>FPY = tamirsiz iyi modül / tamamlanan</code></div>
+        <div role="listitem"><b>Arıza ve bakım</b><code>MTBF / MTTR · planlı bakım aralığı</code></div>
+        <div role="listitem"><b>Malzeme</b><code>(s, Q) stok politikası · tedarik süresi</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ctm" class="band">
     <div class="wrap two">
       <div>
         <h2>Şeffaf CTM modeli</h2>
@@ -80,7 +98,7 @@
     </div>
   </section>
 
-  <section id="kutuphane" class="band">
+  <section id="kutuphane">
     <div class="wrap">
       <h2>Hammadde kütüphanesi</h2>
       <p class="lead2"><b id="libTotal">220+</b> malzeme varyantı, <b id="libCats">19</b> kategori, 125 mm’den G12’ye ve Al-BSF’ten tandem hücreye kadar. Arayın, karşılaştırın, tek dokunuşla tasarıma uygulayın. Kendi malzemelerinizi ve tedarikçi fiyat listenizi ekleyin.</p>
@@ -94,7 +112,7 @@
     </div>
   </section>
 
-  <section id="kurulum">
+  <section id="kurulum" class="band">
     <div class="wrap">
       <h2>Telefona yükleyin</h2>
       <p>Uygulama bir PWA’dır: mağaza gerekmez, ana ekrana eklenir ve internet olmadan çalışır. Güncellemeler açılışta otomatik gelir.</p>

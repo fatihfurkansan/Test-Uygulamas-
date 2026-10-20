@@ -499,7 +499,7 @@ $('#resetBtn').onclick=()=>{const b=$('#resetBtn');if(!resetArm){resetArm=true;b
 
 /* ---- Sekmeler ---- */
 const TABS=['tasarim','cizim','mekanik','ctm','elektrik','tolerans','olcum','maliyet','saha','kutuphane','karsilastir','kayit'];
-function go(t){if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;if(t==='tolerans')mcAuto();if(t==='cizim'&&window.renderSheets)renderSheets();document.dispatchEvent(new CustomEvent('tabshown',{detail:t}));try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
+function go(t){if(window.showHat){if(t==='hat'){showHat(true);return;}showHat(false);}if(!TABS.includes(t))t='tasarim';for(const b of $$('.tab'))b.setAttribute('aria-selected',b.dataset.tab===t);for(const p of $$('[data-panel]'))p.hidden=p.dataset.panel!==t;if(t==='tolerans')mcAuto();if(t==='cizim'&&window.renderSheets)renderSheets();document.dispatchEvent(new CustomEvent('tabshown',{detail:t}));try{history.replaceState(null,'','#'+t);}catch(e){}window.scrollTo(0,0);}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)go(b.dataset.tab);});
 window.addEventListener('hashchange',()=>go((location.hash||'').slice(1)));
 

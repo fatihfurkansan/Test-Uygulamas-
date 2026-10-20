@@ -24,6 +24,10 @@
 <header class="top">
   <div class="wrap bar">
     <a class="brand" href="../" aria-label="Ana sayfa"><b>PV Modül Tasarım</b><span id="hdrName">–</span></a>
+    <div class="modesw" id="modeSw" role="group" aria-label="Bölüm">
+      <button type="button" data-mode="tasarim" aria-pressed="true"><span class="lg">Modül tasarımı</span><span class="sm">Tasarım</span></button>
+      <button type="button" data-mode="hat" aria-pressed="false"><span class="lg">Hat simülasyonu</span><span class="sm">Simülasyon</span></button>
+    </div>
     <button class="btn sm pri" id="installBtn" hidden>Uygulamayı yükle</button>
     <div class="kpis" id="kpis"></div>
   </div>
@@ -263,8 +267,11 @@
     </div>
   </section>
 </main>
+<!-- HAT SİMÜLASYONU: 3D üretim hattı simülatörü (/sim/), ilk açılışta yüklenir -->
+<section id="hatRoot" aria-label="Hat simülasyonu" hidden></section>
 <dialog id="libDlg" aria-label="Malzeme detayı"><div id="libDlgBody"></div></dialog>
 
+<script src="../assets/js/hat.js"></script>
 <script src="../assets/js/library.js"></script>
 <script src="../assets/js/iv.js"></script>
 <script src="../assets/js/engine.js"></script>

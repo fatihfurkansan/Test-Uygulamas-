@@ -59,6 +59,24 @@ button,select,input,textarea{font:inherit;color:inherit}
 .tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
 @media (max-width:620px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi b{font-size:14px}}
 
+/* Bölüm anahtarı: Modül tasarımı | Hat simülasyonu */
+.modesw{display:flex;flex:none;gap:2px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.modesw button{appearance:none;border:0;background:none;padding:6px 12px;border-radius:4px;cursor:pointer;white-space:nowrap;
+  font-family:var(--f-display);font-size:15px;font-weight:600;letter-spacing:.01em;color:var(--muted)}
+.modesw button:hover{color:var(--fg)}
+.modesw button[aria-pressed="true"]{background:var(--raised);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.modesw .sm{display:none}
+@media (max-width:620px){.brand{flex-basis:110px}.modesw .lg{display:none}.modesw .sm{display:inline}.modesw button{padding:6px 10px}}
+/* Hat simülasyonu: başlığın altında kalan ekranın tamamı; simülatör kendi açık temasını kullanır */
+body.mode-hat{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+body.mode-hat>main,body.mode-hat #tabs,body.mode-hat #kpis,body.mode-hat #installBtn{display:none!important}
+body.mode-hat .top{position:relative;flex:none}
+#hatRoot{position:relative;flex:1;min-height:0;background:#f2f0eb;
+  padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+@media (max-height:520px){body.mode-hat .brand span{display:none}body.mode-hat .bar{padding-block:4px}}
+.hatmsg{margin:0;padding:24px max(16px,env(safe-area-inset-left,0px));color:#4b5058}
+.hatmsg.er{color:#b42318}
+
 main{padding-block:16px 48px}
 .panel{display:flex;flex-direction:column;gap:14px}
 .card{background:var(--raised);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
