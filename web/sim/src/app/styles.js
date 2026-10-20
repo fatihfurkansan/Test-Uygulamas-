@@ -356,6 +356,9 @@ td .pv-flag{margin-left:6px}
 .pv-dialog-head,.pv-dialog-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px}
 .pv-dialog-foot small{color:var(--ink-3)}
 .pv-dialog textarea{flex:1;min-height:240px;margin:0 14px;border:1px solid var(--rule);background:#fff;padding:10px;font:400 12px/1.45 var(--mono);color:var(--ink);resize:none}
+.pv-file{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none}
+.pv-dialog-foot{flex-wrap:wrap}
+.pv-dialog-foot>span{display:flex;gap:8px;flex:none;margin-left:auto}
 .pv-toast{position:absolute;z-index:45;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 14px;border-radius:2px;font-weight:500;box-shadow:0 6px 18px rgba(22,24,27,.2)}
 .pv-toast.pv-err{background:var(--stop)}
 .pv-toast[hidden]{display:none}

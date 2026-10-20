@@ -75,6 +75,7 @@ const TEMPLATE = `
         <button data-act="lines">Kayıtlı hatlarım…</button>
         <hr>
         <button data-act="open">Dosyadan aç… (.simjson)</button>
+        <button data-act="paste">Metinden aç (yapıştır)…</button>
         <button data-act="save">Dosyaya kaydet (.simjson)</button>
       </div>
     </div>
@@ -117,7 +118,7 @@ const TEMPLATE = `
     <div class="pv-side-body"></div>
   </aside>
 </div>
-<input type="file" accept=".simjson,.json" hidden>`;
+<input type="file" class="pv-file" tabindex="-1" aria-hidden="true">`;
 
 // exportMode: 'download' (dosya indirir) | 'dialog' (metni kopyalanabilir pencerede gösterir — indirmenin
 // engellendiği gömülü önizlemeler için)
@@ -323,24 +324,79 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
       case 'full': loadSample('full'); break;
       case 'open': fileInput.click(); break;
       case 'save': exportFile('hat.simjson', JSON.stringify(session.toJSON(), null, 2), 'application/json'); break;
+      case 'paste': pasteDialog(); break;
     }
   };
   root.addEventListener('click', onClick);
   const onDocDown = e => { if (!e.target.closest('.pv-menuwrap')) closeMenus(); };
   doc.addEventListener('pointerdown', onDocDown);
 
+  // Dosya seçicide uzantı filtresi yok (telefonlar .simjson'u tanımayıp dosyayı soluk gösterir);
+  // içerik okunup hat dosyası olduğu doğrulanır
   fileInput.addEventListener('change', async () => {
     const f = fileInput.files[0];
     fileInput.value = '';
     if (!f) return;
+    let text;
     try {
-      session.replace(JSON.parse(await f.text()));
-      currentName = session.layout.meta.name || f.name.replace(/\.(simjson|json)$/i, '');
-      toast(`${f.name} açıldı`);
+      text = f.text ? await f.text() : await new Promise((ok, bad) => {
+        const r = new FileReader();
+        r.onload = () => ok(r.result);
+        r.onerror = () => bad(r.error);
+        r.readAsText(f);
+      });
     } catch (err) {
-      toast(`Dosya açılamadı: ${err.message}`, true);
+      toast(`Dosya okunamadı: ${err.message}`, true);
+      return;
     }
+    if (openText(text, f.name.replace(/(\.(simjson|json|txt))+$/i, ''))) toast(`${f.name} açıldı`);
   });
+
+  // .simjson metnini aç; başarılıysa true
+  function openText(text, name = '') {
+    let data;
+    try {
+      data = JSON.parse(String(text).replace(/^\uFEFF/, '').trim());
+    } catch {
+      toast('Bu bir hat dosyası değil: içerik okunamadı (JSON bekleniyor)', true);
+      return false;
+    }
+    if (!data || !Array.isArray(data.stations)) {
+      toast('Bu bir hat dosyası değil: istasyon listesi yok', true);
+      return false;
+    }
+    try {
+      session.replace(data);
+    } catch (err) {
+      toast(`Hat açılamadı: ${err.message}`, true);
+      return false;
+    }
+    currentName = session.layout.meta.name || name;
+    return true;
+  }
+
+  // Dosya seçilemeyen durumlar için: .simjson metnini yapıştırarak aç
+  function pasteDialog() {
+    const d = doc.createElement('div');
+    d.className = 'pv-dialog';
+    d.innerHTML = `<div class="pv-dialog-box" role="dialog" aria-label="Metinden aç"><div class="pv-dialog-head"><b>Metinden aç</b>`
+      + `<button class="pv-ibtn" data-x aria-label="Kapat">${ICON.close}</button></div>`
+      + `<textarea spellcheck="false" placeholder="hat.simjson dosyasının içeriğini buraya yapıştırın"></textarea><div class="pv-dialog-foot">`
+      + `<small>.simjson dosyasını bir metin uygulamasında açıp tümünü kopyalayın.</small>`
+      + `<span>${navigator.clipboard?.readText ? `<button class="pv-tbtn" data-clip>${ICON.copy}Panodan</button> ` : ''}`
+      + `<button class="pv-tbtn pri" data-go>${ICON.open}Aç</button></span></div></div>`;
+    const ta = d.querySelector('textarea');
+    d.addEventListener('click', async e => {
+      if (e.target === d || e.target.closest('[data-x]')) { d.remove(); return; }
+      if (e.target.closest('[data-clip]')) {
+        try { ta.value = await navigator.clipboard.readText(); } catch { toast('Panoya erişilemedi; metni elle yapıştırın', true); }
+        return;
+      }
+      if (e.target.closest('[data-go]') && openText(ta.value)) { d.remove(); toast('Hat açıldı'); }
+    });
+    root.appendChild(d);
+    ta.focus();
+  }
 
   const offs = [
     session.on('state', () => {
@@ -440,8 +496,18 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
     root.appendChild(d);
   }
 
-  function exportFile(name, text, mime) {
+  async function exportFile(name, text, mime) {
     if (exportMode === 'dialog') { textDialog(name, text); return; }
+    // Telefonda paylaşım menüsü (Dosyalara Kaydet, Drive, WhatsApp…); yoksa indirme
+    if (coarse && navigator.share && navigator.canShare) {
+      for (const type of [mime, 'text/plain']) {
+        const file = new File([text], name, { type });
+        if (!navigator.canShare({ files: [file] })) continue;
+        try { await navigator.share({ files: [file], title: name }); }
+        catch (err) { if (err.name !== 'AbortError') toast(`Paylaşılamadı: ${err.message}`, true); }
+        return;
+      }
+    }
     const blob = new Blob([text], { type: mime });
     const a = doc.createElement('a');
     a.href = URL.createObjectURL(blob);
