@@ -319,6 +319,22 @@ td .pv-flag{margin-left:6px}
 .pv-wiz-load b{font:500 13px var(--mono);white-space:nowrap}
 .pv-wiz-load b small{font:400 10.5px var(--ui);color:var(--ink-3)}
 .pv-wiz-load>small{font:500 11.5px var(--mono);color:var(--ink-3);text-align:right}
+.pv-wiz-quality .pv-hint{margin:0 0 10px}
+.pv-wiz-qhead,.pv-wiz-q{display:grid;grid-template-columns:minmax(0,1.5fr) 120px 120px 150px minmax(200px,1.2fr);gap:8px 12px;align-items:center}
+.pv-wiz-qhead{padding:0 0 6px;border-bottom:1px solid var(--rule);font:600 10px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.pv-wiz-q{padding:7px 0;border-bottom:1px solid var(--rule-2)}
+.pv-wiz-q.off{opacity:.35;pointer-events:none}
+.pv-wiz-q select{flex:1;min-width:0;border:0;background:none;height:100%;padding:0 8px;font:500 13px var(--ui);color:var(--ink);outline:none}
+.pv-wiz-q>*,.pv-wiz-rw>*{min-width:0}
+.pv-wiz-rw{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pv-wiz-rw.off{opacity:.35;pointer-events:none}
+.pv-wiz-rw .pv-in{height:30px}
+.pv-wiz-qres{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 18px;margin-top:12px;padding:12px 14px;background:var(--paper);border-left:3px solid var(--accent)}
+.pv-wiz-qres>.cap{grid-column:1/-1}
+.pv-wiz-qres span{display:block;color:var(--ink-2);font-size:12.5px}
+.pv-wiz-qres b{font:600 18px/1.3 var(--ui)}
+.pv-wiz-qres b small{font-size:11.5px;font-weight:500;color:var(--ink-3)}
+.pv-wiz-qres .bad b{color:var(--stop)}
 .pv-wiz-foot{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 28px;background:var(--sheet);border-top:1px solid var(--rule)}
 .pv-wiz-sp{flex:1}
 
@@ -443,7 +459,9 @@ td .pv-flag{margin-left:6px}
   .pv-empty{padding:12px 12px 12px 62px}
 }
 @media (max-width:760px){
-  .pv-wiz-head{display:none}
+  .pv-wiz-head,.pv-wiz-qhead{display:none}
+  .pv-wiz-q{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;padding:10px 0}
+  .pv-wiz-q>.pv-wiz-name,.pv-wiz-q>.pv-wiz-c:last-child{grid-column:1/-1}
   .pv-wiz-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;padding:10px 0}
   .pv-wiz-name,.pv-wiz-load{grid-column:1/-1}
   .pv-wiz-c::before{content:attr(data-l);display:block;margin-bottom:3px;font:600 9.5px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}

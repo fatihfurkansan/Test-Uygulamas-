@@ -44,12 +44,20 @@ export function upstreamStringers(layout, layupId) {
 }
 
 // Efektif cycle: istasyonun 1 panel çıkarması için gereken ortalama süre (sn)
+// Tamire gönderen testte panelin tekrar teste gelme payı (tamirden dönüş ek yükü):
+// NG gelen × yakalama + sağlam gelen × yanlış ret
+export function reinspectShare(s) {
+  if (s.defect_action !== 'rework') return 0;
+  const ng = (100 - (s.fpy ?? 100)) / 100;
+  return ng * (s.detect_rate ?? 0) / 100 + (1 - ng) * (s.false_reject ?? 0) / 100;
+}
+
 export function effectiveCycle(layout, s) {
   const r = Math.max(1, s.num_resources);
   switch (categoryOf(s)) {
     case 'buffer': return 0;
     case 'curing': return s.cycle_time / Math.max(1, s.buffer_capacity);
-    case 'inspection':
+    case 'inspection': return expectedCycle(s) / r * (1 + reinspectShare(s));
     case 'classification': return expectedCycle(s) / r;
   }
   if (s.kind === 'lamination') {
@@ -61,7 +69,8 @@ export function effectiveCycle(layout, s) {
     let stringRate = 0;   // string/sn
     for (const st of upstreamStringers(layout, s.id)) {
       const ct = expectedCycle(st);
-      if (ct > 0) stringRate += Math.max(1, st.num_resources) / ct;
+      // NG stringler stringer'da ayrılır: layup'a yalnız sağlam stringler ulaşır
+      if (ct > 0) stringRate += Math.max(1, st.num_resources) / ct * (1 - Math.min(100, st.string_ng ?? 0) / 100);
     }
     if (stringRate <= 0) return own;
     return Math.max(own, Math.max(1, s.strings_per_panel) / stringRate);
@@ -186,7 +195,13 @@ export function liveStats(layout, engine) {
     lineEfficiency: theoretical > 0 ? Math.min(100, plannedRate / theoretical * 100) : 0,
     scrapped: engine.scrapped,
     scrapBy: { ...engine.scrapBy },
+    stringScrap: engine.stringScrap,
+    stringScrapBy: { ...engine.stringScrapBy },
     escaped: engine.escaped,
+    gradeB: engine.gradeB,
+    gradeA: engine.totalCompleted - engine.gradeB,
+    // A kalite oranı: tamamlananların A kalite payı
+    aRate: engine.totalCompleted > 0 ? (engine.totalCompleted - engine.gradeB) / engine.totalCompleted * 100 : 0,
     firstPassYield: engine.totalCompleted > 0 ? engine.firstPass / engine.totalCompleted * 100 : 0,
     yield: engine.totalCompleted + engine.scrapped > 0
       ? engine.totalCompleted / (engine.totalCompleted + engine.scrapped) * 100 : 0,
@@ -222,6 +237,14 @@ export function liveStats(layout, engine) {
         rejected: rt.rejected,
         reworked: rt.reworked,
         defectsMade: rt.defectsMade,
+        firstSeen: rt.firstSeen,
+        firstNG: rt.firstNG,
+        firstRejected: rt.firstRejected,
+        missed: rt.missed,
+        falseRejects: rt.falseRejects,
+        downgraded: rt.downgraded,
+        stringNG: rt.stringNG,
+        noDefect: rt.noDefect,
         failures: rt.failures,
         oee: stationOEE(engine, s),
         ect: effectiveCycle(layout, s),

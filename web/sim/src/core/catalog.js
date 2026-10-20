@@ -11,7 +11,10 @@
 const K = (code, name, group, category, cycle, size, extra = {}) =>
   ({ code, name, group, category, cycle, size, batch: false, icon: '', color: '#3F6D8E', defaults: {}, ...extra });
 
+// Test varsayılanları: laminasyon öncesi EL → tamir; görsel / FQC → B kalite; elektriksel test → hurda
 const INSPECT = { detect_rate: 100, defect_action: 'rework' };
+const GRADE = { detect_rate: 100, defect_action: 'downgrade' };
+const ELEC = { detect_rate: 100, defect_action: 'scrap' };
 
 export const STATION_CATALOG = {
   // Hazırlık
@@ -41,11 +44,11 @@ export const STATION_CATALOG = {
   // Test ve kalite
   el_test:        K('EL',  'EL Test',            'test',   'inspection', 60,  [3.5, 2.8, 2.4], { icon: '🔬', color: '#0891B2', defaults: INSPECT }),
   el_vi:          K('ELV', 'EL & Görsel Kontrol', 'test',  'inspection', 40,  [4.2, 2.8, 2.4], { defaults: INSPECT }),  // yeni: tek makinede EL + VI
-  visual_control: K('VIS', 'Visual Control',     'test',   'inspection', 20,  [3.0, 2.6, 2.0], { icon: '👁', color: '#164E63', defaults: INSPECT }),
-  iv_test:        K('IV',  'IV Test',            'test',   'inspection', 30,  [3.5, 2.8, 2.4], { icon: '📊', color: '#0E7490', defaults: INSPECT }),
-  flash_test:     K('FLS', 'Flash Test',         'test',   'inspection', 45,  [3.5, 2.8, 2.4], { icon: '💡', color: '#155E75', defaults: INSPECT }),
-  hipot:          K('HPT', 'Hi-Pot / İzolasyon', 'test',   'inspection', 25,  [3.2, 2.8, 2.3], { defaults: INSPECT }), // yeni
-  fqc:            K('FQC', 'FQC',                'test',   'inspection', 35,  [3.5, 2.8, 2.2], { icon: '✅', color: '#14532D', defaults: INSPECT }),
+  visual_control: K('VIS', 'Visual Control',     'test',   'inspection', 20,  [3.0, 2.6, 2.0], { icon: '👁', color: '#164E63', defaults: GRADE }),
+  iv_test:        K('IV',  'IV Test',            'test',   'inspection', 30,  [3.5, 2.8, 2.4], { icon: '📊', color: '#0E7490', defaults: ELEC }),
+  flash_test:     K('FLS', 'Flash Test',         'test',   'inspection', 45,  [3.5, 2.8, 2.4], { icon: '💡', color: '#155E75', defaults: ELEC }),
+  hipot:          K('HPT', 'Hi-Pot / İzolasyon', 'test',   'inspection', 25,  [3.2, 2.8, 2.3], { defaults: ELEC }), // yeni
+  fqc:            K('FQC', 'FQC',                'test',   'inspection', 35,  [3.5, 2.8, 2.2], { icon: '✅', color: '#14532D', defaults: GRADE }),
   rework:         K('RWK', 'Tamir / Rework',     'test',   'process',    300, [4.0, 3.0, 2.2],                         // yeni
                     { defaults: { operators: 1, rework_success: 90, max_rework: 2 } }),
   // Lojistik ve hat sonu
@@ -53,6 +56,11 @@ export const STATION_CATALOG = {
   classification: K('SRT', 'Sınıflandırma',      'logistic', 'classification', 5, [5.2, 6.6, 2.2], { icon: '🗂', color: '#BE185D' }),
   packaging:      K('PKG', 'Paketleme',          'logistic', 'process',  40,  [5.0, 3.0, 2.4], { icon: '📫', color: '#92400E' }),
 };
+
+// Hata türleri: elektriksel testler (IV, flash, Hi-Pot) yalnız elektriksel hataları görür; EL, görsel kontrol
+// ve FQC EL/görsel hataları (çatlak, kayma, yabancı madde) görür. Proses gizli hataları EL/görsel türündendir.
+export const ELEC_TESTS = new Set(['iv_test', 'flash_test', 'hipot']);
+export const defectField = kind => (ELEC_TESTS.has(kind) ? 'elec' : 'defective');
 
 // Editör paletindeki süreç grupları (hattaki sırayla)
 export const GROUPS = [

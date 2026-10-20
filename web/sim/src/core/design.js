@@ -8,7 +8,7 @@
 //   addParallel    aynı bağlantılarla paralel makine
 //   buildLine      sihirbaz: süreç adımları + makine sayıları → bağlı ve yerleşmiş hat
 //   lineBalance    takt, aşama çevrimleri, darboğaz, denge oranı
-import { catalogOf, PRODUCT_COLORS } from './catalog.js';
+import { catalogOf, PRODUCT_COLORS, defectField } from './catalog.js';
 import { Layout } from './layout.js';
 import { lineStages, expectedCycle } from './stats.js';
 import { addStandardBOM } from './bom.js';
@@ -149,6 +149,23 @@ export function autoArrange(layout, { rowLen = ROW_LEN } = {}) {
   L.touch();
 }
 
+// Laminasyondan sonra mı? (normal konveyörlerle geriye doğru bir laminatöre ulaşılıyorsa)
+// Laminasyon sonrası testte NG panel tamir edilemez.
+export function isPostLamination(layout, id) {
+  const seen = new Set([id]);
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop();
+    for (const c of layout.incoming(cur)) {
+      if (isDefect(c) || seen.has(c.from_id)) continue;
+      if (layout.stations.get(c.from_id).kind === 'lamination') return true;
+      seen.add(c.from_id);
+      stack.push(c.from_id);
+    }
+  }
+  return false;
+}
+
 // ── Konum yardımcıları ──
 // Akış yönü (eksene oturtulmuş birim vektör): öncülden bu istasyona, yoksa bu istasyondan ardıla
 export function flowDir(layout, s) {
@@ -260,11 +277,17 @@ export function addParallel(layout, id) {
 // Standart PV modül hattının süreç adımları (akış sırasıyla).
 //   branch: cell (hücre hazırlık, birim string) · string (stringer) · glass (cam kolu → layup) · main
 //   n: makine sayısı · cycle: makine başı çevrim (sn) · cap: kapasite (tampon / kür fırını)
-//   batch: laminasyon partisi · rework: test sonrası tamir döngüsü · required: çıkarılamaz
+//   batch: laminasyon partisi · required: çıkarılamaz
+// Kalite (örnek senaryo: %90 OK string, EL-1'de %7 NG + %2 hatalı karar, tamir; görsel/FQC %98 A):
+//   ok: stringer'da sağlam string oranı (%); NG string ayrılır
+//   fpy: test noktasına sağlam gelen panel oranı (%) · err: hatalı karar (%) → yakalama = 100 − err, yanlış ret = err
+//   action: NG kararı → rework (tamir; yalnız laminasyon öncesi) | downgrade (B kalite) | scrap
+//   reworkSuccess / reworkCycle: tamir istasyonunun başarısı (%) ve süresi (sn)
 export const PROCESS_STEPS = [
   { id: 'laser',    kind: 'cell_laser',     branch: 'cell',   name: 'Hücre lazer kesme',          on: true,  n: 1, cycle: 9 },
   { id: 'cellbuf',  kind: 'buffer',         branch: 'cell',   name: 'Hücre tamponu',              on: true,  cap: 30 },
-  { id: 'stringer', kind: 'stringer',       branch: 'string', name: 'Stringer',                   on: true,  n: 3, cycle: 30, required: true },
+  { id: 'stringer', kind: 'stringer',       branch: 'string', name: 'Stringer',                   on: true,  n: 4, cycle: 30, required: true,
+    ok: 90 },
   { id: 'glass',    kind: 'glass_loader',   branch: 'glass',  name: 'Cam yükleme',                on: true,  n: 1, cycle: 30 },
   { id: 'eva',      kind: 'eva_cutter',     branch: 'glass',  name: 'Ön EVA/POE serme',           on: true,  n: 1, cycle: 25 },
   { id: 'layup',    kind: 'layup',          branch: 'main',   name: 'Layup',                      on: true,  n: 1, cycle: 45, required: true },
@@ -273,7 +296,7 @@ export const PROCESS_STEPS = [
   { id: 'reva',     kind: 'rear_eva',       branch: 'main',   name: 'Arka EVA/POE serme',         on: true,  n: 1, cycle: 20 },
   { id: 'back',     kind: 'backsheet',      branch: 'main',   name: 'Arka cam / backsheet',       on: true,  n: 1, cycle: 20 },
   { id: 'elvi1',    kind: 'el_vi',          branch: 'main',   name: 'EL & VI (laminasyon öncesi)', on: true, n: 1, cycle: 40,
-    rework: true, reworkName: 'Tamir (ön)', reworkCycle: 240 },
+    fpy: 93, err: 2, action: 'rework', reworkName: 'Tamir', reworkSuccess: 90, reworkCycle: 240 },
   { id: 'lambuf',   kind: 'buffer',         branch: 'main',   name: 'Laminasyon tamponu',         on: true,  cap: 12 },
   { id: 'lam',      kind: 'lamination',     branch: 'main',   name: 'Laminasyon',                 on: true,  n: 1, cycle: 330, batch: 6, required: true },
   { id: 'flip',     kind: 'flipper',        branch: 'main',   name: 'Panel çevirici',             on: false, n: 1, cycle: 8 },
@@ -286,11 +309,16 @@ export const PROCESS_STEPS = [
   { id: 'pot',      kind: 'potting',        branch: 'main',   name: 'Potting',                    on: true,  n: 1, cycle: 15 },
   { id: 'cure',     kind: 'curing',         branch: 'main',   name: 'Kürleme',                    on: true,  cycle: 1800, cap: 40 },
   { id: 'clean',    kind: 'cleaning',       branch: 'main',   name: 'Temizlik',                   on: true,  n: 1, cycle: 10 },
-  { id: 'iv',       kind: 'iv_test',        branch: 'main',   name: 'IV / flash test',            on: true,  n: 1, cycle: 30 },
-  { id: 'hipot',    kind: 'hipot',          branch: 'main',   name: 'Hi-Pot / izolasyon',         on: true,  n: 1, cycle: 25 },
+  { id: 'iv',       kind: 'iv_test',        branch: 'main',   name: 'IV / flash test',            on: true,  n: 1, cycle: 30,
+    fpy: 100, err: 0, action: 'scrap' },
+  { id: 'hipot',    kind: 'hipot',          branch: 'main',   name: 'Hi-Pot / izolasyon',         on: true,  n: 1, cycle: 25,
+    fpy: 100, err: 0, action: 'scrap' },
   { id: 'elvi2',    kind: 'el_vi',          branch: 'main',   name: 'EL & VI (son)',              on: true,  n: 1, cycle: 40,
-    rework: true, reworkName: 'Tamir (son)', reworkCycle: 600 },
-  { id: 'fqc',      kind: 'fqc',            branch: 'main',   name: 'FQC',                        on: true,  n: 1, cycle: 35 },
+    fpy: 99, err: 1, action: 'downgrade' },
+  { id: 'vi',       kind: 'visual_control', branch: 'main',   name: 'Görsel kontrol',             on: false, n: 1, cycle: 20,
+    fpy: 98, err: 1, action: 'downgrade' },
+  { id: 'fqc',      kind: 'fqc',            branch: 'main',   name: 'FQC',                        on: true,  n: 1, cycle: 35,
+    fpy: 98, err: 1, action: 'downgrade' },
   { id: 'label',    kind: 'labeling',       branch: 'main',   name: 'Etiketleme',                 on: true,  n: 1, cycle: 10 },
   { id: 'pack',     kind: 'packaging',      branch: 'main',   name: 'Paketleme',                  on: false, n: 1, cycle: 40 },
   { id: 'sort',     kind: 'classification', branch: 'main',   name: 'Sınıflandırma / paletleme',  on: true,  n: 1, cycle: 5, required: true },
@@ -298,14 +326,79 @@ export const PROCESS_STEPS = [
 
 export const defaultSteps = () => structuredClone(PROCESS_STEPS);
 
-// Adımın kapasitesi (modül/saat); tamponda null. Hücre ve stringer birimi string → panel başına string'e bölünür.
+const pctv = v => Math.min(100, Math.max(0, Number(v) || 0)) / 100;
+
+// Testte panelin yeniden teste gelme payı (tamirden dönüş): NG × yakalama + sağlam × yanlış ret
+function reinspect(st) {
+  if (st.action !== 'rework') return 0;
+  const ng = 1 - pctv(st.fpy ?? 100), err = pctv(st.err ?? 0);
+  return ng * (1 - err) + (1 - ng) * err;
+}
+
+// Adımın kapasitesi (modül/saat); tamponda null. Hücre ve stringer birimi string → panel başına string'e bölünür;
+// stringer'da yalnız sağlam stringler sayılır, tamire gönderen testte tamirden dönenler ek yüktür.
 export function stepRate(st, spp) {
   if (st.kind === 'buffer') return null;
   if (!(st.cycle > 0)) return Infinity;
   if (st.kind === 'curing') return Math.max(1, st.cap) * 3600 / st.cycle;
   const per = st.kind === 'lamination' ? Math.max(1, st.batch) : 1;
-  const rate = Math.max(1, st.n) * per * 3600 / st.cycle;
+  let rate = Math.max(1, st.n) * per * 3600 / st.cycle;
+  if (st.kind === 'stringer') rate *= pctv(st.ok ?? 100);
+  rate /= 1 + reinspect(st);
   return st.branch === 'cell' || st.branch === 'string' ? rate / Math.max(1, spp) : rate;
+}
+
+// ── Kalite senaryosu: beklenen sonuç (analitik) ──
+// Panel A kalitedeyken sağlam / hata türüne göre NG payları test sırasıyla izlenir (EL/görsel ve elektriksel hatalar
+// ayrı; bir test yalnız kendi türünü görür). İlk geçişte (100 − fpy)% NG çıkar; NG yakalanır (1 − err) ya da kaçar;
+// kendi türünde hatası olmayan panel err ile yanlışlıkla NG sayılır. NG kararı: tamir (laminasyon öncesi; başarılı →
+// sağlam, başarısız → hurda; yanlış retler teste geri döner) | B kalite | hurda.
+// Stringer'da ayrılan NG stringler: panel başına hurda string.
+export function qualityForecast(steps, spp = 6) {
+  const on = steps.filter(s => s.on || s.required);
+  const str = on.find(s => s.kind === 'stringer');
+  const okS = str ? pctv(str.ok ?? 100) : 1;
+  let ok = 1, B = 0, scrap = 0, rework = 0, laminated = false;
+  const ng = { defective: 0, elec: 0 };
+  let fOk = 1;                               // hiç NG kararı almamış paneller (FPY)
+  const fNg = { defective: 0, elec: 0 };
+  for (const st of on) {
+    if (st.kind === 'lamination') { laminated = true; continue; }
+    if (catalogOf(st.kind).category !== 'inspection') continue;
+    const f = defectField(st.kind), o = f === 'elec' ? 'defective' : 'elec';
+    const p = 1 - pctv(st.fpy ?? 100), err = pctv(st.err ?? 0), det = 1 - err;
+    let action = st.action ?? 'scrap';
+    if (action === 'rework' && laminated) action = 'downgrade';
+    ng[f] += ok * p; ok -= ok * p;
+    fNg[f] += fOk * p; fOk -= fOk * p;
+    const caught = ng[f] * det, frOk = ok * err, frOther = ng[o] * err;
+    fOk *= 1 - err; fNg[f] *= 1 - det; fNg[o] *= 1 - err;
+    ng[f] -= caught;
+    if (action === 'rework') {
+      const r = pctv(st.reworkSuccess ?? 90);
+      rework += (caught + frOk + frOther) / Math.max(1e-9, 1 - err);   // tamirden dönen yeniden yanlış retlenebilir
+      ok += caught * r;
+      scrap += caught * (1 - r);
+    } else {
+      ok -= frOk;
+      ng[o] -= frOther;
+      if (action === 'downgrade') B += caught + frOk + frOther;
+      else scrap += caught + frOk + frOther;
+    }
+  }
+  const ngAll = ng.defective + ng.elec;
+  const done = ok + ngAll + B;
+  return {
+    okString: okS * 100,
+    stringScrapPerPanel: okS > 0 ? Math.max(1, spp) * (1 - okS) / okS : Infinity,
+    aRate: done > 0 ? (ok + ngAll) / done * 100 : 0,
+    fpy: done > 0 ? (fOk + fNg.defective + fNg.elec) / done * 100 : 0,
+    bRate: done > 0 ? B / done * 100 : 0,
+    escapedPpm: done > 0 ? ngAll / done * 1e6 : 0,
+    scrapRate: scrap * 100,                // başlanan panellere göre
+    yield: done * 100,                     // başlanan panelden tamamlanan
+    reworkShare: rework * 100,             // başlanan panel başına tamire gidiş
+  };
 }
 
 // Hedef kapasiteye yetecek makine sayısı (kür fırınında kapasite)
@@ -318,7 +411,13 @@ export function suggestStep(st, target, spp) {
 
 function stepProps(st, spp) {
   const p = { cycle_time: st.cycle };
+  if (catalogOf(st.kind).category === 'inspection' && st.fpy != null) {
+    const err = Math.min(100, Math.max(0, Number(st.err) || 0));
+    Object.assign(p, { fpy: Math.min(100, Math.max(0, Number(st.fpy))), detect_rate: 100 - err, false_reject: err,
+                       defect_action: st.action ?? 'scrap' });
+  }
   switch (st.kind) {
+    case 'stringer': return { ...p, string_ng: 100 - Math.min(100, Math.max(0, Number(st.ok ?? 100))) };
     case 'buffer': return { buffer_capacity: Math.max(1, st.cap) };
     case 'curing': return { ...p, buffer_capacity: Math.max(1, st.cap) };
     case 'layup': return { ...p, strings_per_panel: Math.max(1, spp) };
@@ -353,11 +452,15 @@ export function buildLine({ target = 60, spp = 6, shifts = 3, shiftHours = 8, pr
   chain([...cell, ...str, main[0]]);
   if (glass.length) chain([...glass, main[0]]);
   if (main.length > 1) chain(main);
+  // Tamir döngüsü yalnız laminasyon öncesi testlerde (sonrasında NG panel tamir edilemez)
+  let laminated = false;
   mainSteps.forEach((st, i) => {
+    if (st.kind === 'lamination') laminated = true;
     if (catalogOf(st.kind).category !== 'inspection') return;
-    for (const id of main[i]) L.stations.get(id).defect_action = st.rework ? 'rework' : 'scrap';
-    if (!st.rework) return;
-    const rw = L.addStation('rework', 0, 0, { name: st.reworkName ?? 'Tamir', cycle_time: st.reworkCycle ?? 300 });
+    if (st.action === 'rework' && laminated) for (const id of main[i]) L.stations.get(id).defect_action = 'downgrade';
+    if (st.action !== 'rework' || laminated) return;
+    const rw = L.addStation('rework', 0, 0, { name: st.reworkName ?? 'Tamir', cycle_time: st.reworkCycle ?? 300,
+                                               rework_success: st.reworkSuccess ?? 90 });
     for (const id of main[i]) {
       L.connect(id, rw.id, { ...CONV, type: 'defect' });
       L.connect(rw.id, id, { ...CONV });

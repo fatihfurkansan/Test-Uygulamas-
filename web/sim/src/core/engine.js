@@ -14,7 +14,7 @@
 //
 // Python'dan bilinçli farklar: docs/TASARIM.md §2. Varsayılan parametrelerle (arıza, hata,
 // operatör, malzeme, mola yok) davranış 1. adımdaki motorla aynıdır.
-import { categoryOf } from './catalog.js';
+import { categoryOf, defectField } from './catalog.js';
 import { createRng } from './rng.js';
 
 const EPS = 1e-9;
@@ -60,10 +60,19 @@ function emptyStationStats() {
     stateTime: {},      // durum → saniye
     scenarioHits: {},
     scrapped: 0,        // bu istasyonda hurdaya ayrılan
-    rejected: 0,        // testte reddedilen
+    rejected: 0,        // testte reddedilen (NG kararı)
     defectsMade: 0,     // bu istasyonda oluşan gizli hata
     reworked: 0,        // başarıyla tamir edilen
     failures: 0,
+    // Test istasyonu (ilk geçiş = panelin bu istasyondan ilk geçişi; tamirden dönüş sayılmaz)
+    firstSeen: 0,       // ilk geçişte gelen panel
+    firstNG: 0,         // ilk geçişte gerçekten NG gelen
+    firstRejected: 0,   // ilk geçişte NG kararı verilen
+    missed: 0,          // NG olduğu hâlde geçirilen (kaçan)
+    falseRejects: 0,    // sağlam olduğu hâlde NG sayılan
+    downgraded: 0,      // B kaliteye düşürülen
+    stringNG: 0,        // stringer: ayrılan NG string
+    noDefect: 0,        // tamir: hata bulunamayan (yanlış ret) panel
   };
 }
 
@@ -104,10 +113,13 @@ export class SimEngine {
   // Raporların saydığı değerler (ısınma süresi bitince sıfırlanır)
   _resetStats() {
     this.totalCompleted = 0;
-    this.firstPass = 0;            // hiç reddedilmeden/tamir görmeden tamamlanan
-    this.escaped = 0;              // hat sonuna kadar fark edilmemiş hatalı ürün
-    this.scrapped = 0;
+    this.firstPass = 0;            // hiç NG kararı/tamir görmeden A kalite tamamlanan
+    this.escaped = 0;              // A kalite tamamlanan ama gerçekte NG (müşteriye kaçan)
+    this.gradeB = 0;               // B kaliteye düşmüş tamamlanan
+    this.scrapped = 0;             // hurdaya ayrılan panel (string hurdası ayrı)
     this.scrapBy = {};             // sebep → adet
+    this.stringScrap = 0;          // hurdaya ayrılan string (stringer NG dahil)
+    this.stringScrapBy = {};
     this.lead = { n: 0, sum: 0, min: Infinity, max: 0, samples: [] };
     this.lineTime = { off: 0 };    // vardiya dışı geçen süre
     this.series = [];              // saatlik: {h, completed, scrapped, wip, stock:{id: adet}}
@@ -275,6 +287,11 @@ export class SimEngine {
       state: 'queued', stationId, convId: null, fromId: null,
       createdAt: this.time, startTime: 0, doneTime: 0, bin: null,
       defective: false, rejected: false, route: null, reworkCount: 0,
+      elec: false,         // elektriksel hata (yalnız IV / flash / Hi-Pot görür); defective: EL/görsel hata
+      grade: 'A',          // A | B (testte NG bulunup tamir edilemeyen → B)
+      flagged: false,      // herhangi bir testte NG kararı aldı mı (FPY dışı)
+      laminated: false,    // laminasyondan geçti mi (sonrasında tamir yok)
+      seen: null,          // ilk geçişi yapılmış test istasyonları
     };
     this.products.set(p.id, p);
     this.created++;
@@ -658,10 +675,14 @@ export class SimEngine {
     }
   }
 
+  // B kalite paneller B haznelerine (yoksa tüm haznelere), A kalite A haznelerine
   _sortIntoBin(s, rt, p) {
     if (!s.bins.length) return;
     while (rt.binCounts.length < s.bins.length) rt.binCounts.push(0);
-    const i = this.rng.weightedIndex(s.bins.map(b => b.probability));
+    const want = p.grade === 'B' ? 'B' : 'A';
+    let pool = s.bins.map((b, i) => i).filter(i => (s.bins[i].grade === 'B' ? 'B' : 'A') === want);
+    if (!pool.length) pool = s.bins.map((b, i) => i);
+    const i = pool[this.rng.weightedIndex(pool.map(j => s.bins[j].probability))];
     const b = s.bins[i];
     p.bin = b.name;
     rt.binCounts[i]++;
@@ -688,7 +709,9 @@ export class SimEngine {
     // ADIM 3: 2. oda bittiyse paneller (kalite kontrolünden geçip) soğutmaya
     if (rt.lamRoom2 && rt.lamRoom2.doneTime <= T) {
       for (const p of rt.lamRoom2.items) {
-        if (this._quality(s, rt, p) === 'scrap') { this._scrap(s, rt, p, 'process'); continue; }
+        const q = this._quality(s, rt, p);
+        if (q !== 'ok') { this._scrap(s, rt, p, q); continue; }
+        p.laminated = true;
         p.state = 'lam_cooling';
         p.startTime = this.time;
         p.doneTime = this.time + s.lam_cooling_time;
@@ -751,10 +774,8 @@ export class SimEngine {
       rt.processed += job.items.length;
       for (const p of job.items) {
         if (s.kind === 'stringer') p.isString = true;   // hücre seti → string
-        if (this._quality(s, rt, p) === 'scrap') {
-          this._scrap(s, rt, p, cat === 'inspection' ? 'rejected' : s.kind === 'rework' ? 'rework' : 'process');
-          continue;
-        }
+        const q = this._quality(s, rt, p);
+        if (q !== 'ok') { this._scrap(s, rt, p, q); continue; }
         p.state = 'done_waiting';
         rt.outbox.push(p);
       }
@@ -763,28 +784,65 @@ export class SimEngine {
     this._dispatchFront(s, null, rt.outbox, () => true);
   }
 
-  // Kalite: proses hurda/gizli hata üretir, test yakalar, tamir düzeltir. 'ok' | 'scrap'
+  // Kalite: proses hurda/gizli hata üretir, test NG kararı verir, tamir düzeltir.
+  // Dönüş: 'ok' ya da hurda sebebi ('process' | 'string_ng' | 'rejected' | 'rework').
+  //   Test: ilk geçişte (100 − fpy)% olasılıkla panel burada NG çıkar (önceki gizli hatalara ek);
+  //   NG panel detect_rate ile yakalanır, sağlam panel false_reject ile yanlışlıkla NG sayılır.
+  //   NG kararı → tamir (yalnız laminasyon öncesi; tamir yolu yoksa hurda) | B kalite | hurda.
+  //   B kaliteye düşmüş panel sonraki testlerde yeniden değerlendirilmez.
   _quality(s, rt, p) {
     const cat = categoryOf(s);
     if (cat === 'inspection') {
-      const caught = p.defective ? this._chance(s.detect_rate) : this._chance(s.false_reject);
-      if (!caught) return 'ok';
+      if (p.isString) return 'ok';
+      const f = defectField(s.kind);               // bu testin gördüğü hata türü
+      const first = !(p.seen ??= new Set()).has(s.id);
+      if (first) {
+        p.seen.add(s.id);
+        if (p.grade === 'A') {
+          rt.firstSeen++;
+          if (!p[f] && this._chance(100 - (s.fpy ?? 100))) p[f] = true;
+          if (p[f]) rt.firstNG++;
+        }
+      }
+      if (p.grade !== 'A') return 'ok';
+      const ng = p[f];
+      const caught = ng ? this._chance(s.detect_rate) : this._chance(s.false_reject);
+      if (!caught) {
+        if (ng) rt.missed++;
+        return 'ok';
+      }
       rt.rejected++;
+      if (first) rt.firstRejected++;
+      if (!ng) rt.falseRejects++;
+      p.flagged = true;
+      let action = s.defect_action;
+      if (action === 'rework' && p.laminated) action = 'downgrade';      // laminasyon sonrası tamir yok
+      if (action === 'rework' && !this._hasOut(s.id, 'defect')) action = 'scrap';
+      if (action === 'downgrade') {
+        p.grade = 'B';
+        rt.downgraded++;
+        return 'ok';
+      }
+      if (action === 'scrap') return 'rejected';
       p.rejected = true;
-      if (s.defect_action === 'scrap' || !this._hasOut(s.id, 'defect')) return 'scrap';
       p.route = 'defect';
       return 'ok';
     }
     if (s.kind === 'rework') {
       if (!p.rejected && !p.defective) return 'ok';
       p.reworkCount++;
-      if (p.reworkCount > Math.max(0, s.max_rework) || !this._chance(s.rework_success)) return 'scrap';
-      p.defective = false;
       p.rejected = false;
+      if (!p.defective) { rt.noDefect++; return 'ok'; }               // yanlış ret: hata yok, teste geri
+      if (p.reworkCount > Math.max(0, s.max_rework) || !this._chance(s.rework_success)) return 'rework';
+      p.defective = false;
       rt.reworked++;
       return 'ok';
     }
-    if (this._chance(s.scrap_rate)) return 'scrap';
+    if (s.kind === 'stringer' && this._chance(s.string_ng ?? 0)) {     // string kontrolü: NG string ayrılır
+      rt.stringNG++;
+      return 'string_ng';
+    }
+    if (this._chance(s.scrap_rate)) return 'process';
     if (!p.defective && this._chance(s.defect_rate)) {
       p.defective = true;
       rt.defectsMade++;
@@ -794,9 +852,14 @@ export class SimEngine {
 
   _scrap(s, rt, p, reason) {
     rt.scrapped++;
-    this.scrapped++;
     this.life.scrapped++;
-    this.scrapBy[reason] = (this.scrapBy[reason] ?? 0) + 1;
+    if (p.isString) {                  // string hurdası panel verimine karışmaz
+      this.stringScrap++;
+      this.stringScrapBy[reason] = (this.stringScrapBy[reason] ?? 0) + 1;
+    } else {
+      this.scrapped++;
+      this.scrapBy[reason] = (this.scrapBy[reason] ?? 0) + 1;
+    }
     this.products.delete(p.id);
     p.state = 'scrap';
     this._emit('scrap', { station: s, product: p, reason });
@@ -870,8 +933,11 @@ export class SimEngine {
   _complete(s, p) {
     this.totalCompleted++;
     this.life.completed++;
-    if (!p.reworkCount && !p.rejected) this.firstPass++;
-    if (p.defective) this.escaped++;
+    if (p.grade === 'B') this.gradeB++;
+    else {
+      if (!p.reworkCount && !p.flagged) this.firstPass++;
+      if (p.defective || p.elec) this.escaped++;
+    }
     const lt = this.time - p.createdAt;
     const L = this.lead;
     L.n++;

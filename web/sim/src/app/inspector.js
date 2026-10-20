@@ -6,7 +6,8 @@
 // [data-live] alanları saniyede 4 kez güncellenir (yazılan alan bozulmaz).
 // Alan → hedef eşlemesi data-path ile: st.<alan> · cv.<alan> · set.<alan> · meta.<alan> · sess.<alan>
 //   pt.<id>.<alan> · mat.<id>.<alan> · scen|bin|con|brk.<sıra>.<alan> · ov.<ürün tipi id>
-import { catalogOf, categoryOf, stationTag, STATUS_LABELS, STATUS_COLORS, addStandardBOM, lineBalance } from '../core/index.js';
+import { catalogOf, categoryOf, stationTag, STATUS_LABELS, STATUS_COLORS, addStandardBOM, lineBalance,
+         isPostLamination, ELEC_TESTS } from '../core/index.js';
 import { BIN_COLORS, BELT_TINT, kindTone } from '../view3d/materials.js';
 import { esc, num, pct, sn, duration, row, meter, sec, stateBar, ICON } from './ui.js';
 
@@ -14,6 +15,8 @@ const DISTS = [['fixed', 'Sabit'], ['normal', 'Normal (ort. ± std)'], ['triangu
                ['uniform', 'Düzgün (en az – en çok)'], ['exponential', 'Üstel (ort. = çevrim)']];
 const ROTS = [['', 'Otomatik (akıştan)'], [0, '0°'], [90, '90°'], [180, '180°'], [270, '270°']];
 const CAT_NAME = { process: 'İşlem', inspection: 'Test / kalite', buffer: 'Ara stok', curing: 'Kürleme', classification: 'Hat sonu' };
+const SCRAP_NAME = { process: 'proses', rejected: 'test', rework: 'tamir başarısız', string_ng: 'NG string' };
+const scrapText = by => Object.entries(by).map(([k, v]) => `${SCRAP_NAME[k] ?? k} ${v}`).join(' · ');
 const LINE_TABS = [['summary', 'Özet'], ['balance', 'Denge'], ['products', 'Ürünler'], ['materials', 'Malzemeler'],
                    ['shift', 'Vardiya'], ['model', 'Model']];
 
@@ -171,12 +174,24 @@ export class Inspector {
         + `</div>`);
     }
     html += sec('Durum dağılımı', stateBar(r.stateTime));
-    if (cat !== 'buffer' && cat !== 'curing') {
+    if (cat === 'inspection') {
+      const n = r.firstSeen, p = v => n ? ` <small>${num(v / n * 100)} %</small>` : '';
+      html += sec('Test sonuçları (ilk geçiş)', row('Gelen panel', n)
+        + row('NG gelen', `${r.firstNG}${p(r.firstNG)}`)
+        + row('NG kararı', `${r.firstRejected}${p(r.firstRejected)}`)
+        + row('Gözlenen FPY', n ? pct((n - r.firstRejected) / n * 100) : '—')
+        + row('Kaçan NG', r.missed) + row('Yanlış ret', r.falseRejects)
+        + (r.downgraded ? row('B kaliteye düşen', r.downgraded) : '')
+        + (r.scrapped ? row('Hurdaya ayrılan', r.scrapped) : '')
+        + (r.rejected > r.firstRejected ? row('Tekrar testte NG', r.rejected - r.firstRejected) : '')
+        + (r.failures ? row('Arıza sayısı', r.failures) : ''));
+    } else if (cat !== 'buffer' && cat !== 'curing') {
       let q = '';
-      if (r.scrapped) q += row('Hurda', r.scrapped);
-      if (r.rejected) q += row('Reddedilen', r.rejected);
+      if (r.stringNG) q += row('NG string (ayrılan)', `${r.stringNG} <small>${num(r.stringNG / Math.max(1, r.processed) * 100)} %</small>`);
+      if (r.scrapped - r.stringNG > 0) q += row('Hurda', r.scrapped - r.stringNG);
       if (r.defectsMade) q += row('Oluşan gizli hata', r.defectsMade);
       if (r.reworked) q += row('Tamir edilen', r.reworked);
+      if (r.noDefect) q += row('Hata bulunamayan (yanlış ret)', r.noDefect);
       if (r.failures) q += row('Arıza sayısı', r.failures);
       if (q) html += sec('Kalite ve arıza', q);
     }
@@ -281,30 +296,52 @@ export class Inspector {
 
   _binsForm(s) {
     const total = s.bins.reduce((a, b) => a + Number(b.probability || 0), 0);
-    return `<table class="pv-grid"><tr><th>Hazne</th><th>Olas. %</th><th>Palet</th><th></th></tr>`
+    return `<table class="pv-grid"><tr><th>Hazne</th><th>Kalite</th><th>Olas. %</th><th>Palet</th><th></th></tr>`
       + s.bins.map((b, i) => `<tr><td><i class="sw" style="background:${BIN_COLORS[i % BIN_COLORS.length]}"></i>${cell(`bin.${i}.name`, b.name, { type: 'text' })}</td>`
+        + `<td><select ${attrs(`bin.${i}.grade`, { type: 'text' })}>${['A', 'B'].map(g => `<option${(b.grade ?? 'A') === g ? ' selected' : ''}>${g}</option>`).join('')}</select></td>`
         + `<td>${cell(`bin.${i}.probability`, b.probability, { min: 0, rerender: 1 })}</td>`
         + `<td>${cell(`bin.${i}.capacity`, b.capacity, { type: 'int', min: 1 })}</td><td>${delBtn('del-bin', i)}</td></tr>`).join('')
-      + `</table>` + hint(`Toplam ${num(total)} % (ağırlık). Palet = hazne dolunca depoya giden adet. 3D'de ilk 8 hazne gösterilir.`)
+      + `</table>` + hint(`Olasılık, aynı kalitedeki hazneler arasında ağırlıktır (toplam ${num(total)}). B kalite paneller B haznelerine gider; B hazne yoksa tüm haznelere. Palet = hazne dolunca depoya giden adet. 3D'de ilk 8 hazne gösterilir.`)
       + addBtn('add-bin', 'Hazne');
   }
 
   _qualityForm(s, cat) {
     if (cat === 'inspection') {
-      const noRoute = s.defect_action === 'rework' && !this.L.outgoing(s.id).some(c => c.type === 'defect');
-      return field('Hata yakalama', 'st.detect_rate', s.detect_rate, { min: 0, max: 100, unit: '%', hint: 'Gizli hatalı ürünlerin yakalanma oranı' })
-        + field('Yanlış red', 'st.false_reject', s.false_reject, { min: 0, max: 100, unit: '%', hint: 'Sağlam ürünün yanlışlıkla reddedilmesi' })
-        + select('Yakalanan ürün', 'st.defect_action', s.defect_action,
-          [['rework', 'Tamire gönder (hatalı ürün konveyörü)'], ['scrap', 'Hurdaya ayır']], { rerender: 1 })
-        + (noRoute ? hint('⚠ Bu istasyondan çıkan "Hatalı ürün" tipinde konveyör yok; reddedilen ürünler hurdaya ayrılır. Bağla aracıyla tamir istasyonuna konveyör çekip tipini değiştirin.') : '');
+      const post = isPostLamination(this.L, s.id);
+      const elec = ELEC_TESTS.has(s.kind);
+      const noRoute = !post && s.defect_action === 'rework' && !this.L.outgoing(s.id).some(c => c.type === 'defect');
+      const ng = (100 - (s.fpy ?? 100)) / 100, det = s.detect_rate / 100, fr = s.false_reject / 100;
+      const actions = [...(post ? [] : [['rework', 'Tamire gönder']]), ['downgrade', 'B kaliteye düşür'], ['scrap', 'Hurdaya ayır']];
+      return hint(`Gördüğü hata: <b>${elec ? 'elektriksel' : 'EL / görsel'}</b> (${elec ? 'izolasyon, güç' : 'çatlak, kayma, yabancı madde'}).`
+          + ` ${post ? 'Laminasyon <b>sonrası</b>: NG panel tamir edilemez.' : 'Laminasyon <b>öncesi</b>: NG panel tamir edilebilir.'}`)
+        + field('FPY: sağlam gelen', 'st.fpy', s.fpy ?? 100, { min: 0, max: 100, unit: '%', rerender: 1,
+          hint: 'İlk geçişte panellerin yüzde kaçı sağlam gelir. 100 − FPY burada NG çıkar; önceki istasyonlardan kaçan hatalar buna eklenir.' })
+        + field('NG yakalama', 'st.detect_rate', s.detect_rate, { min: 0, max: 100, unit: '%', rerender: 1,
+          hint: 'NG panelin NG bulunma olasılığı. Kalanı kaçar (hatalı karar: NG → OK).' })
+        + field('Yanlış ret', 'st.false_reject', s.false_reject, { min: 0, max: 100, unit: '%', rerender: 1,
+          hint: 'Sağlam panelin NG sayılma olasılığı (hatalı karar: OK → NG).' })
+        + select('NG kararı', 'st.defect_action', post && s.defect_action === 'rework' ? 'downgrade' : s.defect_action, actions, { rerender: 1 })
+        + (post && s.defect_action === 'rework' ? hint('⚠ Laminasyon sonrası tamir yapılamaz; NG paneller B kaliteye düşer.') : '')
+        + (noRoute ? hint('⚠ Bu istasyondan çıkan "Hatalı ürün" tipinde konveyör yok; NG paneller hurdaya ayrılır. Bağla aracıyla tamir istasyonuna konveyör çekip tipini "Hatalı ürün" yapın.') : '')
+        + `<div class="pv-subhead cap">Beklenen (ilk geçiş, yalnız bu noktada çıkan NG)</div>`
+        + row('NG kararı', pct((ng * det + (1 - ng) * fr) * 100)) + row('Kaçan NG', pct(ng * (1 - det) * 100))
+        + row('Yanlış ret', pct((1 - ng) * fr * 100));
     }
     if (s.kind === 'rework') {
-      return field('Tamir başarısı', 'st.rework_success', s.rework_success, { min: 0, max: 100, unit: '%' })
-        + field('Ürün başına en fazla tamir', 'st.max_rework', s.max_rework, { type: 'int', min: 0, hint: 'Aşılırsa ürün hurdaya ayrılır' });
+      return field('Tamir başarısı', 'st.rework_success', s.rework_success, { min: 0, max: 100, unit: '%', hint: 'Başarısız tamir → hurda' })
+        + field('Panel başına en fazla tamir', 'st.max_rework', s.max_rework, { type: 'int', min: 0, hint: 'Aşılırsa panel hurdaya ayrılır' })
+        + hint('Yalnız laminasyon öncesi testlerin NG kararı verdiği paneller tamire gelir. Tamir edilen panel teste geri döner; hata bulunamayan (yanlış ret) panel olduğu gibi döner.');
     }
-    if (cat === 'classification') return hint('Hat sonunda fark edilmeden gelen hatalı ürünler "kaçan hata" olarak sayılır.');
-    return field('Hurda oranı', 'st.scrap_rate', s.scrap_rate, { min: 0, max: 100, unit: '%', hint: 'İşlem sonunda hurdaya ayrılır (ör. cam kırığı)' })
-      + field('Gizli hata oranı', 'st.defect_rate', s.defect_rate, { min: 0, max: 100, unit: '%', hint: 'Fark edilmez; sonraki test istasyonu yakalar (ör. mikro çatlak)' });
+    if (cat === 'classification') return hint('B kalite paneller kalitesi "B" olan haznelere gider. Hat sonuna fark edilmeden gelen NG paneller "kaçan NG" sayılır.');
+    let h = '';
+    if (s.kind === 'stringer') {
+      h += field('NG string oranı', 'st.string_ng', s.string_ng ?? 0, { min: 0, max: 100, unit: '%', rerender: 1,
+        hint: `String kontrolünde NG çıkan string ayrılır (hurda), panele girmez. Sağlam string: ${num(100 - (s.string_ng ?? 0))} %.` });
+    }
+    return h + field('Hurda oranı', 'st.scrap_rate', s.scrap_rate, { min: 0, max: 100, unit: '%', hint: 'İşlem sonunda hurdaya ayrılır (ör. cam kırığı)' })
+      + field('Gizli hata oranı', 'st.defect_rate', s.defect_rate, { min: 0, max: 100, unit: '%',
+        hint: s.kind === 'stringer' ? 'String kontrolünden kaçan (ör. mikro çatlak); paneli NG yapar, EL testi yakalar'
+          : 'Fark edilmez; sonraki EL / görsel test yakalar (ör. mikro çatlak)' });
   }
 
   _resourceForm(s) {
@@ -373,17 +410,20 @@ export class Inspector {
     st.stations.forEach(r => { counts[r.status] = (counts[r.status] ?? 0) + 1; });
     const n = Math.max(1, st.stations.length);
     const dist = Object.entries(counts).map(([k, c]) => `<i style="width:${c / n * 100}%;background:${STATUS_COLORS[k]}"></i>`).join('');
-    const scrapBy = Object.entries(st.scrapBy).map(([k, v]) => `${{ process: 'proses', rejected: 'test reddi', rework: 'tamir' }[k] ?? k} ${v}`).join(' · ');
+    const scrapBy = scrapText(st.scrapBy);
     let h = (st.warmup ? hint(`Isınma süresi: istatistikler ${duration(this.session.engine.statsT0)} sonunda sayılmaya başlar.`) : '')
       + sec('Üretim', row('Tamamlanan', st.completed.toLocaleString('tr-TR'))
         + row('Saatlik (planlı süre)', live ? `${num(st.plannedRatePerHour)} /sa` : '—')
         + row('Teorik kapasite', st.theoreticalPerHour ? `${num(st.theoreticalPerHour)} /sa` : '—')
         + row('Hat verimi', live && st.theoreticalPerHour ? pct(st.lineEfficiency) : '—')
         + row('Sistemdeki ürün', st.wip) + row('Depoya giden palet', st.pallets))
-      + sec('Kalite', row('Verim (iyi / toplam)', live ? pct(st.yield) : '—')
+      + sec('Kalite', row('A kalite', st.completed ? `${pct(st.aRate)} <small>${st.gradeA}</small>` : '—')
+        + row('B kalite', st.gradeB)
         + row('İlk geçiş verimi (FPY)', st.completed ? pct(st.firstPassYield) : '—')
-        + row('Hurda', st.scrapped + (scrapBy ? ` <small>(${scrapBy})</small>` : ''))
-        + row('Kaçan hata', st.escaped))
+        + row('Verim (tamamlanan / başlanan)', live ? pct(st.yield) : '—')
+        + row('Panel hurdası', st.scrapped + (scrapBy ? ` <small>(${scrapBy})</small>` : ''))
+        + row('String hurdası', st.stringScrap + (st.stringScrap ? ` <small>(${scrapText(st.stringScrapBy)})</small>` : ''))
+        + row('Kaçan NG (A kalitede)', st.escaped))
       + sec('Akış süresi', st.lead.n ? row('Ortalama', duration(st.lead.avg)) + row('Medyan (P50)', duration(st.lead.p50))
         + row('P90', duration(st.lead.p90)) + row('En uzun', duration(st.lead.max)) : '<p class="pv-muted">Henüz tamamlanan ürün yok.</p>');
     if (isFinite(st.operators.pool) || st.operators.used) {

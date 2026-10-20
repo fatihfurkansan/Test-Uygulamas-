@@ -20,7 +20,7 @@ const STATION_SCALARS = [
   'cycle_dist', 'cycle_sd', 'cycle_min', 'cycle_max', 'queue_cap', 'arrival_interval',
   'mtbf_min', 'mttr_min', 'pm_interval_h', 'pm_duration_min', 'setup_time',
   'scrap_rate', 'defect_rate', 'detect_rate', 'false_reject', 'defect_action',
-  'rework_success', 'max_rework', 'operators',
+  'rework_success', 'max_rework', 'operators', 'fpy', 'string_ng',
 ];
 
 export function createStation(id, kind, x, y) {
@@ -32,7 +32,7 @@ export function createStation(id, kind, x, y) {
     batch_size: 1,
     buffer_capacity: 50,
     cycle_scenarios: [],          // [{name, probability(0–100), cycle_time}]
-    bins: [],                     // sınıflandırma hazneleri [{name, probability, capacity, current}]
+    bins: [],                     // sınıflandırma hazneleri [{name, probability, capacity, current, grade: 'A'|'B'}]
     strings_per_panel: 12,        // layup: kaç string = 1 panel
     // Laminasyon parametreleri
     lam_batch_size: 6,
@@ -57,9 +57,12 @@ export function createStation(id, kind, x, y) {
     setup_time: 0,                // ürün tipi değişiminde ayar süresi (sn)
     scrap_rate: 0,                // % işlem sonunda hurdaya ayrılan
     defect_rate: 0,               // % gizli hata oluşan (testte yakalanır)
-    detect_rate: 0,               // test: hatalı ürünü yakalama oranı (%)
-    false_reject: 0,              // test: sağlam ürünü yanlışlıkla reddetme (%)
-    defect_action: 'rework',      // test: yakalanan ürün → rework (hatalı ürün konveyörü) | scrap
+    fpy: 100,                     // test: bu kontrol noktasına sağlam gelen panel oranı (%) — ilk geçişte;
+                                  //       100 − fpy kadarı burada NG çıkar (önceki gizli hatalara ek)
+    detect_rate: 0,               // test: NG paneli yakalama oranı (%)
+    false_reject: 0,              // test: sağlam paneli yanlışlıkla NG sayma (%)
+    defect_action: 'rework',      // test: NG → rework (tamir; yalnız laminasyon öncesi) | downgrade (B kalite) | scrap
+    string_ng: 0,                 // stringer: NG string oranı (%) — stringer'da ayrılır, panele girmez
     rework_success: 90,           // tamir: başarı oranı (%)
     max_rework: 2,                // tamir: ürün başına en fazla tamir
     operators: 0,                 // iş başına gereken operatör (0 = otomatik)
@@ -70,7 +73,7 @@ export function createStation(id, kind, x, y) {
   if (kind === 'curing') s.buffer_capacity = 20;
   if (kind === 'classification') {
     s.bins = Array.from({ length: 8 }, (_, i) => (
-      { name: `Sınıf-${i + 1}`, probability: 100 / 8, capacity: 100, current: 0 }));
+      { name: `Sınıf-${i + 1}`, probability: 100 / 8, capacity: 100, current: 0, grade: 'A' }));
   }
   return s;
 }
@@ -227,7 +230,8 @@ export class Layout {
         cycle_scenarios: s.cycle_scenarios.map(sc => ({
           name: sc.name, probability: sc.probability, cycle_time: sc.cycle_time })),
         bins: s.bins.map((b, i) => ({
-          name: b.name, probability: b.probability, capacity: b.capacity, current: binCurrent(s, i) })),
+          name: b.name, probability: b.probability, capacity: b.capacity, current: binCurrent(s, i),
+          ...(b.grade === 'B' ? { grade: 'B' } : {}) })),
         consumes: s.consumes.map(c => ({ material_id: c.material_id, qty: c.qty })),
       })),
       conveyors: [...this.conveyors.values()].map(c => ({
@@ -257,7 +261,8 @@ export class Layout {
       // Python dosyadaki hazneleri boş listeye ekler; dosyada varsa varsayılanların yerine geçer
       if (sd.bins !== undefined) {
         s.bins = sd.bins.map(b => ({
-          name: b.name, probability: b.probability, capacity: b.capacity, current: b.current ?? 0 }));
+          name: b.name, probability: b.probability, capacity: b.capacity, current: b.current ?? 0,
+          grade: b.grade === 'B' ? 'B' : 'A' }));
       }
       s.consumes = (sd.consumes ?? []).map(c => ({ material_id: c.material_id, qty: c.qty }));
       L.stations.set(s.id, s);

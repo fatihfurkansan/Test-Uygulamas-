@@ -77,8 +77,9 @@ export class ReportPanel {
       + `<div class="pv-tiles">`
       + tile('Hat verimi (OEE)', live && st.theoreticalPerHour ? pct(st.lineEfficiency) : '—', st.bottleneck ? `darboğaz ${esc(st.bottleneck.name)}` : '')
       + tile('Teorik kapasite', st.theoreticalPerHour ? `${num(st.theoreticalPerHour)} /sa` : '—')
-      + tile('Verim', live ? pct(st.yield) : '—', `${st.scrapped} hurda`)
-      + tile('İlk geçiş verimi', st.completed ? pct(st.firstPassYield) : '—', `${st.escaped} kaçan hata`)
+      + tile('A kalite', st.completed ? pct(st.aRate) : '—', `${st.gradeB} B kalite · ${st.escaped} kaçan NG`)
+      + tile('İlk geçiş verimi (FPY)', st.completed ? pct(st.firstPassYield) : '—', 'tamirsiz, ilk seferde A')
+      + tile('Verim', live ? pct(st.yield) : '—', `${st.scrapped} panel · ${st.stringScrap} string hurda`)
       + tile('Ortalama akış süresi', st.lead.n ? duration(st.lead.avg) : '—', st.lead.n ? `P90 ${duration(st.lead.p90)}` : '')
       + tile('Sistemdeki ürün', st.wip, `${st.pallets} palet depoda`)
       + `</div>` + this._hourlyChart() + this._wipChart();
@@ -348,8 +349,9 @@ export class ReportPanel {
     const line = cells => cells.map(n).join(';');
     const out = [line(['Simülasyon raporu', `istatistik süresi (sa)`, st.statsTime / 3600])];
     out.push(line(['Tamamlanan', st.completed]), line(['Saatlik (planlı)', st.plannedRatePerHour]),
-             line(['Hat verimi %', st.lineEfficiency]), line(['Verim %', st.yield]), line(['FPY %', st.firstPassYield]),
-             line(['Hurda', st.scrapped]), line(['Kaçan hata', st.escaped]), line(['Ort. akış süresi (sn)', st.lead.avg]), '');
+             line(['Hat verimi %', st.lineEfficiency]), line(['A kalite %', st.aRate]), line(['B kalite', st.gradeB]),
+             line(['FPY %', st.firstPassYield]), line(['Verim %', st.yield]), line(['Panel hurdası', st.scrapped]),
+             line(['String hurdası', st.stringScrap]), line(['Kaçan NG', st.escaped]), line(['Ort. akış süresi (sn)', st.lead.avg]), '');
     out.push(line(['Etiket', 'İstasyon', 'İşlenen', 'Kullanım %', 'A %', 'P %', 'Q %', 'OEE %', 'Hurda', 'Red', 'Arıza',
                    ...STATE_ORDER.map(k => `${STATUS_LABELS[k]} (sn)`)]));
     for (const r of st.stations) {

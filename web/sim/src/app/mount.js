@@ -59,7 +59,7 @@ const TEMPLATE = `
     <div class="pv-ro"><span class="cap">Tamamlanan</span><b data-k="done">0</b></div>
     <div class="pv-ro"><span class="cap">Saatlik</span><b data-k="rate">—</b></div>
     <div class="pv-ro"><span class="cap">Hat verimi</span><b data-k="eff">—</b></div>
-    <div class="pv-ro"><span class="cap">Verim</span><b data-k="yield">—</b></div>
+    <div class="pv-ro"><span class="cap">A kalite</span><b data-k="yield">—</b></div>
     <div class="pv-ro bn"><span class="cap">Darboğaz</span><b data-k="bn">—</b></div>
   </div>
   <div class="pv-tools">
@@ -581,7 +581,7 @@ export function mountLineSimulator(container, { layout = null, sample = !layout,
     out('done').textContent = st.completed.toLocaleString('tr-TR');
     out('rate').innerHTML = live ? `${num(st.plannedRatePerHour)}<small>/sa</small>` : '—';
     out('eff').innerHTML = live && st.theoreticalPerHour ? `${num(st.lineEfficiency)}<small>%</small>` : '—';
-    out('yield').innerHTML = live && st.completed + st.scrapped ? `${num(st.yield)}<small>%</small>` : '—';
+    out('yield').innerHTML = st.completed ? `${num(st.aRate)}<small>%</small>` : '—';
     const bn = st.bottleneck;
     out('bn').textContent = bn ? `${bn.name} · ${num(bn.ect)} sn` : '—';
     out('bn').title = out('bn').textContent;
